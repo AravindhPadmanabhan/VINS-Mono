@@ -17,6 +17,7 @@ queue<sensor_msgs::ImageConstPtr> img_buf;
 
 ros::Publisher pub_img,pub_match;
 ros::Publisher pub_restart;
+ros::Publisher pub_cotracker;
 
 FeatureTracker trackerData[NUM_OF_CAM];
 double first_image_time;
@@ -203,6 +204,11 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
     ROS_INFO("whole feature tracker processing costs: %f", t_r.toc());
 }
 
+void cotracker_callback(const sensor_msgs::ImageConstPtr &img_msg) {
+    ROS_INFO("cotracker_callback");
+    pub_cotracker.publish(img_msg);
+}
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "feature_tracker");
@@ -229,10 +235,12 @@ int main(int argc, char **argv)
     }
 
     ros::Subscriber sub_img = n.subscribe(IMAGE_TOPIC, 100, img_callback);
+    ros::Subscriber sub_cotracker = n.subscribe("/output_image", 100, cotracker_callback);
 
     pub_img = n.advertise<sensor_msgs::PointCloud>("feature", 1000);
     pub_match = n.advertise<sensor_msgs::Image>("feature_img",1000);
     pub_restart = n.advertise<std_msgs::Bool>("restart",1000);
+    pub_cotracker = n.advertise<sensor_msgs::Image>("cotracker_img",1000);
     /*
     if (SHOW_TRACK)
         cv::namedWindow("vis", cv::WINDOW_NORMAL);

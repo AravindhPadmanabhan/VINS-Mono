@@ -1,0 +1,12 @@
+<launch>
+    <!-- Launch the image_processor_node -->
+    <node
+        pkg="cotracker_pkg"
+        type="cotracker_node.py"
+        name="cotracker_node"
+        output="screen">
+        <!-- Remap topics -->
+        <!-- <remap from="/input_image" to="/camera/image_raw" />
+        <remap from="/output_image" to="/processed_image" /> -->
+    </node>
+</launch>

@@ -293,7 +293,7 @@ bool Estimator::initialStructure()
         cv::Mat r, rvec, t, D, tmp_r;
         if((frame_it->first) == Headers[i].stamp.toSec())
         {
-            frame_it->second.is_key_frame = true;
+            frame_it->second.is_key_frame = true; // If relativePose or sfm failed, code would not reach here. SfM has succeeded and thus this frame is a key frame.
             frame_it->second.R = Q[i].toRotationMatrix() * RIC[0].transpose();
             frame_it->second.T = T[i];
             i++;
