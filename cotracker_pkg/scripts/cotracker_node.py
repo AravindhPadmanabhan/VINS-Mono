@@ -60,7 +60,7 @@ class ImageProcessorNode:
             results = self.window.track()
 
             if self.debug:
-                debug_image = self.window.debug_features()
+                debug_image = self.window.debug_tracks()
                 ros_debug_image = self.bridge.cv2_to_imgmsg(debug_image, encoding='bgr8')
                 self.debug_publisher.publish(ros_debug_image)
                 print("trajectories shape: ", results[0].shape)
