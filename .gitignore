@@ -9,3 +9,21 @@ A3_rs.launch
 test/
 test.launch
 .vscode/
+
+# Ignore __pycache__ directories
+__pycache__/
+**/__pycache__/
+
+# Ignore compiled Python files
+*.pyc
+
+# Ignore environment files
+.env
+*.env
+
+# Ignore logs
+*.log
+
+# Ignore system-specific files
+.DS_Store
+Thumbs.db
