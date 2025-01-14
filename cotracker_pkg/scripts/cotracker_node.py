@@ -42,7 +42,7 @@ class ImageProcessorNode:
         self.bridge = CvBridge()
 
         # Initialize the CoTrackerWindow object
-        self.window = CoTrackerWindow(checkpoint='/home/aravindh/ETH/Thesis/co-tracker/checkpoints/scaled_online.pth', device='cuda')
+        self.window = CoTrackerWindow(checkpoint='/home/tap/co-tracker/checkpoints/scaled_online.pth', device='cuda')
         self.debug = True
 
         rospy.loginfo("Image Processor Node is running.")
