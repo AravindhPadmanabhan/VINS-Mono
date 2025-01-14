@@ -50,11 +50,15 @@ class CoTrackerWindow:
         keypoints_tensor = torch.tensor(keypoints_xy, dtype=torch.float32).to(self.device)  # Shape: (N, 2)
         
         indices = torch.ones(num_queries, 1).to(self.device) * (self.video_len - 1)
-        self.queries = torch.cat((indices, keypoints_tensor), dim=1)  # Shape: (N, 3)
-        self.queries = self.queries.unsqueeze(0) # Shape: (1, N, 3)
+        queries = torch.cat((indices, keypoints_tensor), dim=1)  # Shape: (N, 3)
+        queries = queries.unsqueeze(0) # Shape: (1, N, 3)
+
+        return queries
 
     def update_queries(self, tracks):
         tracked_queries = self.queries[:, self.track_status, :]
+
+        print("tracked queries no: ", tracked_queries.shape[1])
         
         if self.max_queries - tracked_queries.shape[1] > 0:
             self.new_queries = self.get_queries(self.max_queries - tracked_queries.shape[1])
@@ -63,12 +67,12 @@ class CoTrackerWindow:
         # Move queries behind by one frame:
         self.queries[0, :, 0] -= 1
         out_of_window_mask = self.queries[0, :, 0] < 0
-        traces = torch.cat((torch.zeros(1,100,1), tracks[:,1,:,:]), dim=-1)
-        self.queries = torch.where(out_of_window_mask, traces, self.queries)
+        traces = torch.cat((torch.zeros(1,100,1).to(self.device), tracks[:,1,:,:]), dim=-1)
+        self.queries = torch.where(out_of_window_mask.unsqueeze(-1), traces, self.queries)
 
     def track(self):
         if self.queries is None:
-            self.get_queries(self.max_queries)
+            self.queries = self.get_queries(self.max_queries)
 
         is_first_step = True
         for i in range(3):
@@ -109,8 +113,9 @@ class CoTrackerWindow:
             if self.track_status[i]:
                 cv2.circle(latest_frame_np, (x, y), 5, (0, 255, 0), -1)
 
-        for query in self.new_queries[0]:
-            x, y = int(query[1]), int(query[2])
-            cv2.circle(latest_frame_np, (x, y), 5, (0, 0, 255), -1)
+        if self.new_queries is not None:
+            for query in self.new_queries[0]:
+                x, y = int(query[1]), int(query[2])
+                cv2.circle(latest_frame_np, (x, y), 5, (0, 0, 255), -1)
 
         return latest_frame_np
