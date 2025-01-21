@@ -10,6 +10,17 @@ bool inBorder(const cv::Point2f &pt)
     return BORDER_SIZE <= img_x && img_x < COL - BORDER_SIZE && BORDER_SIZE <= img_y && img_y < ROW - BORDER_SIZE;
 }
 
+void reduceVector(vector<cv::Point2f> &v, vector<int> &indices, vector<uchar> status)
+{
+    int j = 0;
+    for (int i = 0; i < int(v.size()); i++)
+        if (status[i])
+            v[j++] = v[i];
+            indices[j++] = indices[i];
+    v.resize(j);
+    indices.resize(j);
+}
+
 void reduceVector(vector<cv::Point2f> &v, vector<uchar> status)
 {
     int j = 0;
@@ -33,7 +44,7 @@ FeatureTracker::FeatureTracker()
 {
 }
 
-void FeatureTracker::setMask()
+void FeatureTracker::setMask(vector<int> &indices)
 {
     if(FISHEYE)
         mask = fisheye_mask.clone();
@@ -42,12 +53,12 @@ void FeatureTracker::setMask()
     
 
     // prefer to keep features that are tracked for long time
-    vector<pair<int, pair<cv::Point2f, int>>> cnt_pts_id;
+    vector<pair<int, pair<pair<int, cv::Point2f>, int>>> cnt_pts_id;
 
     for (unsigned int i = 0; i < forw_pts.size(); i++)
-        cnt_pts_id.push_back(make_pair(track_cnt[i], make_pair(forw_pts[i], ids[i])));
+        cnt_pts_id.push_back(make_pair(track_cnt[i], make_pair(make_pair(indices[i], forw_pts[i]), ids[i])));
 
-    sort(cnt_pts_id.begin(), cnt_pts_id.end(), [](const pair<int, pair<cv::Point2f, int>> &a, const pair<int, pair<cv::Point2f, int>> &b)
+    sort(cnt_pts_id.begin(), cnt_pts_id.end(), [](const pair<int, pair<pair<int, cv::Point2f>, int>> &a, const pair<int, pair<pair<int, cv::Point2f>, int>> &b)
          {
             return a.first > b.first;
          });
@@ -55,34 +66,44 @@ void FeatureTracker::setMask()
     forw_pts.clear();
     ids.clear();
     track_cnt.clear();
+    indices.clear();
 
     for (auto &it : cnt_pts_id)
     {
-        if (mask.at<uchar>(it.second.first) == 255)
+        if (mask.at<uchar>(it.second.first.second) == 255)
         {
-            forw_pts.push_back(it.second.first);
+            forw_pts.push_back(it.second.first.second);
             ids.push_back(it.second.second);
             track_cnt.push_back(it.first);
-            cv::circle(mask, it.second.first, MIN_DIST, 0, -1);
+            indices.push_back(it.second.first.first);
+            cv::circle(mask, it.second.first.second, MIN_DIST, 0, -1);
         }
     }
 }
 
 void FeatureTracker::addPoints()
-{
+{   vector<cv::Point2f> new_queries;
     for (auto &p : n_pts)
     {
         forw_pts.push_back(p);
         ids.push_back(-1);
         track_cnt.push_back(1);
+        new_queries.push_back(p);
     }
+
+    return new_queries;
 }
 
-void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
+void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time, vector<cv::Point2f> &track_pts, vector<uchar> &track_status)
 {
     cv::Mat img;
     TicToc t_r;
     cur_time = _cur_time;
+
+    vector<int> indices;
+    for(int i=0; i<track_pts.size(); i++) {
+        indices.push_back(i);
+    }
 
     if (EQUALIZE)
     {
@@ -108,28 +129,31 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
     if (cur_pts.size() > 0)
     {
         TicToc t_o;
-        vector<uchar> status;
-        vector<float> err;
-        cv::calcOpticalFlowPyrLK(cur_img, forw_img, cur_pts, forw_pts, status, err, cv::Size(21, 21), 3);
+        // vector<uchar> status;
+        // vector<float> err;
+        // cv::calcOpticalFlowPyrLK(cur_img, forw_img, cur_pts, forw_pts, status, err, cv::Size(21, 21), 3);
+        forw_pts = track_pts
 
         for (int i = 0; i < int(forw_pts.size()); i++)
-            if (status[i] && !inBorder(forw_pts[i]))
-                status[i] = 0;
-        reduceVector(prev_pts, status);
-        reduceVector(cur_pts, status);
-        reduceVector(forw_pts, status);
-        reduceVector(ids, status);
-        reduceVector(cur_un_pts, status);
-        reduceVector(track_cnt, status);
+            if (track_status[i] && !inBorder(forw_pts[i]))
+                track_status[i] = 0;
+        reduceVector(prev_pts, track_status);
+        reduceVector(cur_pts, track_status);
+        reduceVector(forw_pts, indices, track_status);
+        reduceVector(ids, track_status);
+        reduceVector(cur_un_pts, track_status);
+        reduceVector(track_cnt, track_status);
         ROS_DEBUG("temporal optical flow costs: %fms", t_o.toc());
     }
 
     for (auto &n : track_cnt)
         n++;
 
+    vector<cv::Point2f> new_queries;
+
     if (PUB_THIS_FRAME)
     {
-        rejectWithF();
+        rejectWithF(indices);
         ROS_DEBUG("set mask begins");
         TicToc t_m;
         setMask();
@@ -154,7 +178,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
 
         ROS_DEBUG("add feature begins");
         TicToc t_a;
-        addPoints();
+        new_queries = addPoints();
         ROS_DEBUG("selectFeature costs: %fms", t_a.toc());
     }
     prev_img = cur_img;
@@ -164,9 +188,19 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
     cur_pts = forw_pts;
     undistortedPoints();
     prev_time = cur_time;
+
+    vector<int> removed_indices;
+    std::unordered_set<int> indices_set(indices.begin(), indices.end());
+    for (int i=0; i<MAX_CNT; i++) {
+        if (indices_set.find(i) == indices_set.end()) {
+            removed_indices.push_back(i);
+        }
+    }
+
+    return make_pair(new_queries, removed_indices);
 }
 
-void FeatureTracker::rejectWithF()
+void FeatureTracker::rejectWithF(vector<int> &indices)
 {
     if (forw_pts.size() >= 8)
     {
@@ -192,7 +226,7 @@ void FeatureTracker::rejectWithF()
         int size_a = cur_pts.size();
         reduceVector(prev_pts, status);
         reduceVector(cur_pts, status);
-        reduceVector(forw_pts, status);
+        reduceVector(forw_pts, indices, status);
         reduceVector(cur_un_pts, status);
         reduceVector(ids, status);
         reduceVector(track_cnt, status);

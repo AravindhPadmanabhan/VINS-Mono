@@ -2,10 +2,14 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/PointCloud.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/Imu.h>
 #include <std_msgs/Bool.h>
 #include <cv_bridge/cv_bridge.h>
 #include <message_filters/subscriber.h>
+
+#include <message_filters/time_synchronizer.h>
+#include <message_filters/sync_policies/exact_time.h>
 
 #include "feature_tracker.h"
 
@@ -26,7 +30,74 @@ bool first_image_flag = true;
 double last_image_time = 0;
 bool init_pub = 0;
 
-void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
+
+void readForwardPoints(const sensor_msgs::PointCloud2ConstPtr &msg)
+{
+    // Vectors to store the extracted x, y and status values
+    vector<cv::Point2f> points2d;   // For storing (x, y) pairs
+    vector<uchar> status_values;    // For storing status values (uchar)
+
+    // Iterate over the PointCloud2 message using iterators
+    sensor_msgs::PointCloud2Iterator<float> iter_x(*msg, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(*msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(*msg, "z");
+    sensor_msgs::PointCloud2Iterator<float> iter_status(*msg, "status");
+
+    // Iterate through all points
+    for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z, ++iter_status)
+    {
+        // Create a cv::Point2f object for x, y and push it to the vector
+        points2d.push_back(cv::Point2f(*iter_x, *iter_y));
+
+        // Store the status (cast to uchar)
+        status_values.push_back(static_cast<uchar>(*iter_status));
+    }
+
+    return make_pair<vector<cv::Point2f>, vector<uchar>>(points2d, status_values)
+}
+
+void publish_queries(const pair<vector<cv::Point2f>, vector<int>>& queries, const std_msgs::Header& header) {
+
+    std::vector<cv::Point2f> points2d = queries.first;
+    std::vector<int> channel_values = queries.second;
+
+    if (points2d.size() != channel_values.size()) {
+        ROS_ERROR("Size of points2d and channel_values must match!");
+        return;
+    }
+
+    // Create the PointCloud2 message
+    sensor_msgs::PointCloud2 pointcloud_msg;
+    pointcloud_msg.header = header;
+    pointcloud_msg.height = 1;  // Unordered point cloud
+    pointcloud_msg.width = points2d.size();
+    pointcloud_msg.is_bigendian = false;
+    pointcloud_msg.is_dense = true;  // No NaN values
+
+    // Define fields: x, y, z, channel
+    sensor_msgs::PointCloud2Modifier modifier(pointcloud_msg);
+    modifier.setPointCloud2FieldsByString(2, "xyz", "status");
+    modifier.resize(points2d.size());
+
+    // Fill the data using iterators
+    sensor_msgs::PointCloud2Iterator<float> iter_x(pointcloud_msg, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(pointcloud_msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(pointcloud_msg, "z");
+    sensor_msgs::PointCloud2Iterator<float> iter_channel(pointcloud_msg, "indices");
+
+    for (size_t i = 0; i < points2d.size(); ++i, ++iter_x, ++iter_y, ++iter_z, ++iter_channel) {
+        *iter_x = points2d[i].x;
+        *iter_y = points2d[i].y;
+        *iter_z = 0.0;  // Assign z = 0
+        *iter_channel = static_cast<float>(channel_values[i]);  // Store the channel value
+    }
+
+    // Publish the message
+    pub_queries.publish(pointcloud_msg);
+}
+
+
+void features_callback(const sensor_msgs::ImageConstPtr &img_msg, const sensor_msgs::PointCloud2ConstPtr &pts_msg)
 {
     if(first_image_flag)
     {
@@ -78,13 +149,19 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
     else
         ptr = cv_bridge::toCvCopy(img_msg, sensor_msgs::image_encodings::MONO8);
 
+    track_results = readForwardPoints(pts_msg)
+    forw_pts = track_results.first
+    status = track_results.second
+
+    pair<vector<cv::Point2f>, vector<int>> queries;
+
     cv::Mat show_img = ptr->image;
     TicToc t_r;
     for (int i = 0; i < NUM_OF_CAM; i++)
     {
         ROS_DEBUG("processing camera %d", i);
         if (i != 1 || !STEREO_TRACK)
-            trackerData[i].readImage(ptr->image.rowRange(ROW * i, ROW * (i + 1)), img_msg->header.stamp.toSec());
+            queries = trackerData[i].readImage(ptr->image.rowRange(ROW * i, ROW * (i + 1)), img_msg->header.stamp.toSec(), forw_pts, status);
         else
         {
             if (EQUALIZE)
@@ -112,7 +189,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
     }
 
    if (PUB_THIS_FRAME)
-   {
+   {    publish_queries(queries, img_msg->header);
         pub_count++;
         sensor_msgs::PointCloudPtr feature_points(new sensor_msgs::PointCloud);
         sensor_msgs::ChannelFloat32 id_of_point;
@@ -234,13 +311,22 @@ int main(int argc, char **argv)
         }
     }
 
-    ros::Subscriber sub_img = n.subscribe(IMAGE_TOPIC, 100, img_callback);
-    ros::Subscriber sub_cotracker = n.subscribe("/output_image", 100, cotracker_callback);
+    // Subscribers for the two topics
+    message_filters::Subscriber<sensor_msgs::Image> sub_img(nh, IMAGE_TOPIC, 1);
+    message_filters::Subscriber<sensor_msgs::PointCloud2> sub_pts(nh, "/cotracker/forward_points", 1);
+
+    // Synchronization policy
+    typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::PointCloud2> MySyncPolicy;
+    message_filters::Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), sub_img, sub_pts);
+
+    // Register the callback
+    sync.registerCallback(boost::bind(&features_callback, _1, _2));
+
 
     pub_img = n.advertise<sensor_msgs::PointCloud>("feature", 1000);
     pub_match = n.advertise<sensor_msgs::Image>("feature_img",1000);
     pub_restart = n.advertise<std_msgs::Bool>("restart",1000);
-    pub_cotracker = n.advertise<sensor_msgs::Image>("cotracker_img",1000);
+    pub_queries = n.advertise<sensor_msgs::PointCloud2>("queries",1000);
     /*
     if (SHOW_TRACK)
         cv::namedWindow("vis", cv::WINDOW_NORMAL);
