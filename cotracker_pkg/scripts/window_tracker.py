@@ -28,51 +28,31 @@ class CoTrackerWindow:
         if len(self.video) > self.video_len:
             self.video.pop(0)
 
-    def get_queries(self, num_queries):
-        query_frame = self.video[-1]
+    def update_queries(self, new_points, removed_indices):
+        new_points = torch.tensor(new_points, dtype=torch.float32).to(self.device)  # Shape: (N,2)
+        frame = torch.ones(new_points.shape[0], 1).to(self.device) * (self.video_len - 1)  # Shape: (N,1)
+        self.new_queries = torch.cat((frame, new_points), dim=1).unsqueeze(0)  # Shape: (1,N,3)
 
-        image_np = query_frame.permute(1, 2, 0).cpu().numpy()
-        image_np = image_np.astype(np.uint8)
-        image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
-        gray_image = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY)
-        gray_image = np.clip(gray_image, 0, 255).astype(np.uint8)
-
-        sift = cv2.SIFT_create(nfeatures=num_queries)
-        keypoints = sift.detect(gray_image, None)
-        keypoints = sorted(keypoints, key=lambda kp: kp.response, reverse=True)  # Sort by response
-
-        keypoints = keypoints[:num_queries]
-
-        # Convert keypoints to a list of (x, y) coordinates
-        keypoints_xy = [kp.pt for kp in keypoints]  # Extract x, y coordinates
-
-        # Convert to PyTorch tensors
-        keypoints_tensor = torch.tensor(keypoints_xy, dtype=torch.float32).to(self.device)  # Shape: (N, 2)
+        if self.queries is None:
+            self.queries = self.new_queries
+            self.max_queries = self.queries.shape[1]
+        else:
+            mask = torch.ones(self.queries.shape[1], dtype=torch.bool)  # Create a mask for all points
+            mask[removed_indices] = False
+            self.queries = self.queries[:, mask, :]
+            self.queries = torch.cat((self.queries, self.new_queries), dim=1)
         
-        indices = torch.ones(num_queries, 1).to(self.device) * (self.video_len - 1)
-        queries = torch.cat((indices, keypoints_tensor), dim=1)  # Shape: (N, 3)
-        queries = queries.unsqueeze(0) # Shape: (1, N, 3)
-
-        return queries
-
-    def update_queries(self, tracks):
-        tracked_queries = self.queries[:, self.track_status, :]
-
-        print("tracked queries no: ", tracked_queries.shape[1])
-        
-        if self.max_queries - tracked_queries.shape[1] > 0:
-            self.new_queries = self.get_queries(self.max_queries - tracked_queries.shape[1])
-            self.queries = torch.cat((tracked_queries, self.new_queries), dim=1)
-
         # Move queries behind by one frame:
         self.queries[0, :, 0] -= 1
-        out_of_window_mask = self.queries[0, :, 0] < 0
-        traces = torch.cat((torch.zeros(1,100,1).to(self.device), tracks[:,1,:,:]), dim=-1)
-        self.queries = torch.where(out_of_window_mask.unsqueeze(-1), traces, self.queries)
+        if self.cur_tracks is not None:
+            out_of_window_mask = self.queries[0, :, 0] < 0
+            traces = torch.cat((torch.zeros(1,self.max_queries,1).to(self.device), self.cur_tracks[:,1,:,:]), dim=-1)
+            self.queries = torch.where(out_of_window_mask.unsqueeze(-1), traces, self.queries)
 
     def track(self):
+        
         if self.queries is None:
-            self.queries = self.get_queries(self.max_queries)
+            return None, None
 
         is_first_step = True
         for i in range(3):
@@ -86,9 +66,7 @@ class CoTrackerWindow:
         self.track_status = ((conf[0,-1,:] > 0.6) * vis[0,-1,:]) == 1
         self.cur_tracks = tracks
 
-        self.update_queries(tracks)
-
-        return tracks, vis
+        return tracks[0,-1,:,:], self.track_status
     
     def debug_features(self):
         # Mark the queries on the image
