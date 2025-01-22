@@ -19,7 +19,7 @@ def create_pointcloud_msg(points, status, image_stamp):
             PointField(name="x", offset=0, datatype=PointField.FLOAT32, count=1),
             PointField(name="y", offset=4, datatype=PointField.FLOAT32, count=1),
             PointField(name="z", offset=8, datatype=PointField.FLOAT32, count=1),
-            PointField(name="status", offset=12, datatype=PointField.UINT8, count=1),
+            PointField(name="status", offset=12, datatype=PointField.FLOAT32, count=1),
         ]
 
     # Create the PointCloud2 message
@@ -29,8 +29,8 @@ def create_pointcloud_msg(points, status, image_stamp):
 
     points_with_status = []
     if points is not None and status is not None:
-        points = points.numpy()
-        status = np.array(status, dtype=np.uint8)
+        points = points.cpu().numpy()
+        status = np.array(status.cpu(), dtype=np.float32)
 
         # Add z = 0 and channel to the points
         points_with_status = np.hstack([
@@ -39,6 +39,8 @@ def create_pointcloud_msg(points, status, image_stamp):
             status.reshape(-1, 1)  # channel
         ])
 
+    # print(points_with_status)
+    # print(points_with_status.shape)
 
     pointcloud_msg = pc2.create_cloud(header, fields, points_with_status)
     return pointcloud_msg
@@ -53,14 +55,14 @@ class ImageProcessorNode:
         self.query_subscriber = rospy.Subscriber("/feature_tracker/queries", PointCloud2, self.queries_callback)
 
         # Create a publisher for the output topic
-        self.points_publisher = rospy.Publisher('forward_points', PointCloud2, queue_size=10)
-        self.debug_publisher = rospy.Publisher('debug_image', Image, queue_size=10)
+        self.points_publisher = rospy.Publisher('/cotracker/forward_points', PointCloud2, queue_size=10)
+        self.debug_publisher = rospy.Publisher('/cotracker/debug_image', Image, queue_size=10)
 
         # Initialize CvBridge
         self.bridge = CvBridge()
 
         # Initialize the CoTrackerWindow object
-        self.window = CoTrackerWindow(checkpoint='/home/tap/co-tracker/checkpoints/scaled_online.pth', device='cuda')
+        self.window = CoTrackerWindow(checkpoint='/home/co-tracker/checkpoints/scaled_online.pth', device='cuda')
         self.debug = True
 
         rospy.loginfo("Image Processor Node is running.")
@@ -92,9 +94,10 @@ class ImageProcessorNode:
         indices = []
         for p in pc2.read_points(msg, field_names=field_names, skip_nans=True):
             points.append([p[0], p[1]])  # x, y
-            indices.append(p[3])          # intensity (or other channel)
+            indices.append(int(p[3]))          # intensity (or other channel)
 
         self.window.update_queries(points, indices)
+        rospy.loginfo("Queries updated.")
 
 
 if __name__ == '__main__':

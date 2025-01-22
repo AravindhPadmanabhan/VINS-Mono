@@ -86,10 +86,11 @@ class CoTrackerWindow:
         latest_frame_np = latest_frame_np.astype(np.uint8)
         latest_frame_np = cv2.cvtColor(latest_frame_np, cv2.COLOR_RGB2BGR)
 
-        for i in range(self.max_queries):
-            x, y = int(self.cur_tracks[0,-1,i,0]), int(self.cur_tracks[0,-1,i,1])
-            if self.track_status[i]:
-                cv2.circle(latest_frame_np, (x, y), 5, (0, 255, 0), -1)
+        if self.cur_tracks is not None:
+            for i in range(self.max_queries):
+                x, y = int(self.cur_tracks[0,-1,i,0]), int(self.cur_tracks[0,-1,i,1])
+                if self.track_status[i]:
+                    cv2.circle(latest_frame_np, (x, y), 5, (0, 255, 0), -1)
 
         if self.new_queries is not None:
             for query in self.new_queries[0]:

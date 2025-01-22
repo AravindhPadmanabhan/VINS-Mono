@@ -11,27 +11,33 @@ find_package(catkin REQUIRED COMPONENTS
     sensor_msgs
     cv_bridge
     camera_model
-    )
+    message_filters
+)
 
 find_package(OpenCV REQUIRED)
 
-catkin_package()
+catkin_package(
+    CATKIN_DEPENDS
+        roscpp
+        std_msgs
+        sensor_msgs
+        cv_bridge
+        camera_model
+        message_filters
+)
 
 include_directories(
     ${catkin_INCLUDE_DIRS}
-    )
-
-set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-find_package(Eigen3)
-include_directories(
-  ${catkin_INCLUDE_DIRS}
-  ${EIGEN3_INCLUDE_DIR}
+    ${EIGEN3_INCLUDE_DIR}
 )
 
 add_executable(feature_tracker
     src/feature_tracker_node.cpp
     src/parameters.cpp
     src/feature_tracker.cpp
-    )
+)
 
-target_link_libraries(feature_tracker ${catkin_LIBRARIES} ${OpenCV_LIBS})
+target_link_libraries(feature_tracker
+    ${catkin_LIBRARIES}
+    ${OpenCV_LIBS}
+)
