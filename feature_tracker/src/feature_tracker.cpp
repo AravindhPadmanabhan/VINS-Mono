@@ -13,10 +13,13 @@ bool inBorder(const cv::Point2f &pt)
 void reduceVector(vector<cv::Point2f> &v, vector<int> &indices, vector<uchar> status)
 {
     int j = 0;
-    for (int i = 0; i < int(v.size()); i++)
-        if (status[i])
+    for (int i = 0; i < int(v.size()); i++) {
+        if (status[i]) {
             v[j++] = v[i];
             indices[j++] = indices[i];
+        }
+    }
+
     v.resize(j);
     indices.resize(j);
 }
@@ -81,7 +84,7 @@ void FeatureTracker::setMask(vector<int> &indices)
     }
 }
 
-void FeatureTracker::addPoints()
+vector<cv::Point2f> FeatureTracker::addPoints()
 {   vector<cv::Point2f> new_queries;
     for (auto &p : n_pts)
     {
@@ -94,7 +97,7 @@ void FeatureTracker::addPoints()
     return new_queries;
 }
 
-void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time, vector<cv::Point2f> &track_pts, vector<uchar> &track_status)
+pair<vector<cv::Point2f>, vector<int>> FeatureTracker::readImage(const cv::Mat &_img, double _cur_time, vector<cv::Point2f> &track_pts, vector<uchar> &track_status)
 {
     cv::Mat img;
     TicToc t_r;
@@ -132,7 +135,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time, vector<cv:
         // vector<uchar> status;
         // vector<float> err;
         // cv::calcOpticalFlowPyrLK(cur_img, forw_img, cur_pts, forw_pts, status, err, cv::Size(21, 21), 3);
-        forw_pts = track_pts
+        forw_pts = track_pts;
 
         for (int i = 0; i < int(forw_pts.size()); i++)
             if (track_status[i] && !inBorder(forw_pts[i]))
@@ -156,7 +159,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time, vector<cv:
         rejectWithF(indices);
         ROS_DEBUG("set mask begins");
         TicToc t_m;
-        setMask();
+        setMask(indices);
         ROS_DEBUG("set mask costs %fms", t_m.toc());
 
         ROS_DEBUG("detect feature begins");

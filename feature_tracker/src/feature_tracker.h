@@ -31,11 +31,11 @@ class FeatureTracker
   public:
     FeatureTracker();
 
-    void readImage(const cv::Mat &_img,double _cur_time);
+    pair<vector<cv::Point2f>, vector<int>> readImage(const cv::Mat &_img,double _cur_time, vector<cv::Point2f> &track_pts, vector<uchar> &track_status);
 
-    void setMask();
+    void setMask(vector<int> &indices);
 
-    void addPoints();
+    vector<cv::Point2f> addPoints();
 
     bool updateID(unsigned int i);
 
@@ -43,7 +43,7 @@ class FeatureTracker
 
     void showUndistortion(const string &name);
 
-    void rejectWithF();
+    void rejectWithF(vector<int> &indices);
 
     void undistortedPoints();
 
