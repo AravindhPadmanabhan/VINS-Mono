@@ -9,7 +9,20 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 ## Declare this package as a catkin package
-catkin_package()
+catkin_package(
+  CATKIN_DEPENDS message_runtime std_msgs
+)
+
+add_service_files(
+  FILES
+  cotracker.srv
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  sensor_msgs
+)
 
 ## Mark scripts for installation
 catkin_install_python(PROGRAMS

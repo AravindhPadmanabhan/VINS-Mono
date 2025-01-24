@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
     cv_bridge
     camera_model
     message_filters
+    cotracker_pkg
 )
 
 find_package(OpenCV REQUIRED)
@@ -35,6 +36,7 @@ add_executable(feature_tracker
     src/feature_tracker_node.cpp
     src/parameters.cpp
     src/feature_tracker.cpp
+    src/utils.cpp
 )
 
 target_link_libraries(feature_tracker

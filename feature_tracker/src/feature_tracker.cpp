@@ -84,29 +84,21 @@ void FeatureTracker::setMask(vector<int> &indices)
     }
 }
 
-vector<cv::Point2f> FeatureTracker::addPoints()
-{   vector<cv::Point2f> new_queries;
+void FeatureTracker::addPoints()
+{   
     for (auto &p : n_pts)
     {
         forw_pts.push_back(p);
         ids.push_back(-1);
         track_cnt.push_back(1);
-        new_queries.push_back(p);
     }
-
-    return new_queries;
 }
 
-pair<vector<cv::Point2f>, vector<int>> FeatureTracker::readImage(const cv::Mat &_img, double _cur_time, vector<cv::Point2f> &track_pts, vector<uchar> &track_status)
+void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& header)
 {
     cv::Mat img;
     TicToc t_r;
-    cur_time = _cur_time;
-
-    vector<int> indices;
-    for(int i=0; i<track_pts.size(); i++) {
-        indices.push_back(i);
-    }
+    cur_time = header.stamp.toSec();
 
     if (EQUALIZE)
     {
@@ -128,6 +120,23 @@ pair<vector<cv::Point2f>, vector<int>> FeatureTracker::readImage(const cv::Mat &
     }
 
     forw_pts.clear();
+    vector<int> indices; // indices of forw_pts. Keeps track of which forw_pts are rejected so that they can be replaced by n_pts in the server.
+
+    // Call the service
+    vector<uchar> track_status;
+    cotracker_pkg::cotracker srv = createRequest(n_pts, removed_indices, forw_img, header); // new_queries instead of n_pts? If not, remove new_queries.
+    if (client_.call(srv)) {
+        const auto& forw_pts_msg = srv.response.forward_points;
+        if (forw_pts_msg.points.size() > 0) {  // equivalent to cur_pts.size() > 0 as presence of cur_pts would imply presence of tracks of cur_pts
+            auto result = readResponse(forw_pts_msg); // is the order of forw_pts preserved?
+            forw_pts = result.first;
+            track_status = result.second;
+            for(int i=0; i<forw_pts.size(); i++)
+                indices.push_back(i);
+        }
+    } else {
+        ROS_ERROR("Failed to call cotracker service.");
+    }
 
     if (cur_pts.size() > 0)
     {
@@ -135,7 +144,6 @@ pair<vector<cv::Point2f>, vector<int>> FeatureTracker::readImage(const cv::Mat &
         // vector<uchar> status;
         // vector<float> err;
         // cv::calcOpticalFlowPyrLK(cur_img, forw_img, cur_pts, forw_pts, status, err, cv::Size(21, 21), 3);
-        forw_pts = track_pts;
 
         for (int i = 0; i < int(forw_pts.size()); i++)
             if (track_status[i] && !inBorder(forw_pts[i]))
@@ -151,8 +159,6 @@ pair<vector<cv::Point2f>, vector<int>> FeatureTracker::readImage(const cv::Mat &
 
     for (auto &n : track_cnt)
         n++;
-
-    vector<cv::Point2f> new_queries;
 
     if (PUB_THIS_FRAME)
     {
@@ -181,7 +187,7 @@ pair<vector<cv::Point2f>, vector<int>> FeatureTracker::readImage(const cv::Mat &
 
         ROS_DEBUG("add feature begins");
         TicToc t_a;
-        new_queries = addPoints();
+        addPoints();
         ROS_DEBUG("selectFeature costs: %fms", t_a.toc());
     }
     prev_img = cur_img;
@@ -192,15 +198,12 @@ pair<vector<cv::Point2f>, vector<int>> FeatureTracker::readImage(const cv::Mat &
     undistortedPoints();
     prev_time = cur_time;
 
-    vector<int> removed_indices;
     std::unordered_set<int> indices_set(indices.begin(), indices.end());
     for (int i=0; i<MAX_CNT; i++) {
         if (indices_set.find(i) == indices_set.end()) {
             removed_indices.push_back(i);
         }
     }
-
-    return make_pair(new_queries, removed_indices);
 }
 
 void FeatureTracker::rejectWithF(vector<int> &indices)

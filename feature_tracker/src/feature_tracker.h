@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <iostream>
 #include <queue>
+#include <vector>
 #include <unordered_set>
 #include <execinfo.h>
 #include <csignal>
@@ -10,9 +11,14 @@
 #include <opencv2/opencv.hpp>
 #include <eigen3/Eigen/Dense>
 
+#include <sensor_msgs/PointCloud.h>
+#include <geometry_msgs/Point32.h>
+
 #include "camodocal/camera_models/CameraFactory.h"
 #include "camodocal/camera_models/CataCamera.h"
 #include "camodocal/camera_models/PinholeCamera.h"
+
+#include <cotracker_pkg/cotracker.h>
 
 #include "parameters.h"
 #include "tic_toc.h"
@@ -24,18 +30,21 @@ using namespace Eigen;
 bool inBorder(const cv::Point2f &pt);
 
 void reduceVector(vector<cv::Point2f> &v, vector<uchar> status);
-void reduceVector(vector<int> &v, vector<uchar> status);
+void reduceVector(vector<int> &v, vector<uchar> status); 
+
+pair<vector<cv::Point2f>, vector<uchar>> readResponse(const sensor_msgs::PointCloudConstPtr& msg);
+cotracker_pkg::cotracker createRequest(const vector<cv::Point2f>& queries, const vector<int>& removed_indices, const cv::Mat& img, const std_msgs::Header& header);
 
 class FeatureTracker
 {
   public:
     FeatureTracker();
 
-    pair<vector<cv::Point2f>, vector<int>> readImage(const cv::Mat &_img,double _cur_time, vector<cv::Point2f> &track_pts, vector<uchar> &track_status);
+    void readImage(const cv::Mat &_img, const std_msgs::Header& header);
 
     void setMask(vector<int> &indices);
 
-    vector<cv::Point2f> addPoints();
+    void addPoints();
 
     bool updateID(unsigned int i);
 
@@ -56,6 +65,7 @@ class FeatureTracker
     vector<cv::Point2f> pts_velocity;
     vector<int> ids;
     vector<int> track_cnt;
+    vector<int> removed_indices;
     map<int, cv::Point2f> cur_un_pts_map;
     map<int, cv::Point2f> prev_un_pts_map;
     camodocal::CameraPtr m_camera;
@@ -63,4 +73,6 @@ class FeatureTracker
     double prev_time;
 
     static int n_id;
+
+    ros::ServiceClient client_;
 };

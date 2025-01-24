@@ -3,59 +3,49 @@
 import os
 import sys
 import rospy
-from sensor_msgs.msg import Image
-from sensor_msgs.msg import PointCloud2, PointField
-import sensor_msgs.point_cloud2 as pc2
+from sensor_msgs.msg import Image, PointCloud, ChannelFloat32
+from geometry_msgs.msg import Point32
 from cv_bridge import CvBridge
 import numpy as np
 
 sys.path.append(os.path.dirname(__file__))
 
+from cotracker_pkg.srv import cotracker, cotrackerResponse 
 from window_tracker import CoTrackerWindow
 
-def create_pointcloud_msg(points, status, image_stamp):  
-    # Define PointCloud2 fields (x, y, z, channel)
-    fields = [
-            PointField(name="x", offset=0, datatype=PointField.FLOAT32, count=1),
-            PointField(name="y", offset=4, datatype=PointField.FLOAT32, count=1),
-            PointField(name="z", offset=8, datatype=PointField.FLOAT32, count=1),
-            PointField(name="status", offset=12, datatype=PointField.FLOAT32, count=1),
-        ]
+def create_pointcloud_msg(points, status, image_stamp):
+    # Create the PointCloud message
+    pointcloud_msg = PointCloud()
+    pointcloud_msg.header.frame_id = "map"
+    pointcloud_msg.header.stamp = image_stamp
 
-    # Create the PointCloud2 message
-    header = rospy.Header()
-    header.frame_id = "map"
-    header.stamp = image_stamp
-
-    points_with_status = []
     if points is not None and status is not None:
+        # Convert points and status to numpy arrays
         points = points.cpu().numpy()
         status = np.array(status.cpu(), dtype=np.float32)
 
-        # Add z = 0 and channel to the points
-        points_with_status = np.hstack([
-            points,  # x, y
-            np.zeros((points.shape[0], 1)),  # z
-            status.reshape(-1, 1)  # channel
-        ])
+        # Create a channel for status
+        status_channel = ChannelFloat32()
+        status_channel.name = "status"
 
-    # print(points_with_status)
-    # print(points_with_status.shape)
+        for i in range(points.shape[0]):
+            point = Point32()
+            point.x = points[i, 0]
+            point.y = points[i, 1]
+            point.z = 0.0  # Set z = 0
+            pointcloud_msg.points.append(point)
+            status_channel.values.append(status[i])
 
-    pointcloud_msg = pc2.create_cloud(header, fields, points_with_status)
+        pointcloud_msg.channels.append(status_channel)
+
     return pointcloud_msg
-
-class ImageProcessorNode:
+class CoTrackerNode:
     def __init__(self):
         # Initialize the ROS node
-        rospy.init_node('cotracker_node')
-
-        # Create a subscriber to the input topic
-        self.image_subscriber = rospy.Subscriber("/cam0/image_raw", Image, self.image_callback)
-        self.query_subscriber = rospy.Subscriber("/feature_tracker/queries", PointCloud2, self.queries_callback)
+        rospy.init_node('cotracker_service')
+        self.service = rospy.Service("cotracker", cotracker, self.track_callback)
 
         # Create a publisher for the output topic
-        self.points_publisher = rospy.Publisher('/cotracker/forward_points', PointCloud2, queue_size=10)
         self.debug_publisher = rospy.Publisher('/cotracker/debug_image', Image, queue_size=10)
 
         # Initialize CvBridge
@@ -65,7 +55,16 @@ class ImageProcessorNode:
         self.window = CoTrackerWindow(checkpoint='/home/co-tracker/checkpoints/scaled_online.pth', device='cuda')
         self.debug = True
 
-        rospy.loginfo("Image Processor Node is running.")
+        rospy.loginfo("CoTracker Node is running.")
+
+    def track_callback(self, request):
+        if (len(self.window.video)==0):
+            forward_points_msg = self.image_callback(request.image)
+            return cotrackerResponse(forward_points_msg)
+            
+        self.queries_callback(request.new_queries)
+        forward_points_msg = self.image_callback(request.image)
+        return cotrackerResponse(forward_points_msg)
 
     def image_callback(self, msg):
         # Convert ROS Image message to OpenCV image
@@ -74,27 +73,26 @@ class ImageProcessorNode:
         self.window.add_image(cv_image)
         forw_pts, status = self.window.track()            
         forw_pts_msg = create_pointcloud_msg(forw_pts, status, msg.header.stamp)
-        self.points_publisher.publish(forw_pts_msg)
 
         if self.debug:
             debug_image = self.window.debug_tracks()
             ros_debug_image = self.bridge.cv2_to_imgmsg(debug_image, encoding='bgr8')
             self.debug_publisher.publish(ros_debug_image)
-            # print("trajectories shape: ", results[0].shape)
-            # print("visibility shape: ", results[1].shape)
 
         rospy.loginfo("Image processed and published.")
+        return forw_pts_msg
 
     def queries_callback(self, msg):
-        # Specify the fields to extract: "x", "y", "z", and an additional channel (e.g., "intensity")
-        field_names = ["x", "y", "z", "indices"]
-
         # Extract points and additional channel from the PointCloud2 message
         points = []
         indices = []
-        for p in pc2.read_points(msg, field_names=field_names, skip_nans=True):
-            points.append([p[0], p[1]])  # x, y
-            indices.append(int(p[3]))          # intensity (or other channel)
+        if not msg.channels or len(msg.channels[0].values) != len(msg.points):
+            rospy.logwarn("PointCloud message has inconsistent channels or no data.")
+            return
+        
+        for point, channel_value in zip(msg.points, msg.channels[0].values):
+            points.append([point.x, point.y])  # Extract x, y
+            indices.append(int(channel_value))          # intensity (or other channel)
 
         self.window.update_queries(points, indices)
         rospy.loginfo("Queries updated.")
@@ -102,7 +100,7 @@ class ImageProcessorNode:
 
 if __name__ == '__main__':
     try:
-        node = ImageProcessorNode()
+        node = CoTrackerNode()
         rospy.spin()
     except rospy.ROSInterruptException:
-        rospy.loginfo("Shutting down Image Processor Node.")
+        rospy.loginfo("Shutting down CoTracker Node.")
