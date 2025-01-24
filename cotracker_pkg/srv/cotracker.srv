@@ -1,0 +1,7 @@
+# Request
+sensor_msgs/Image image
+sensor_msgs/PointCloud new_queries
+
+---
+# Response
+sensor_msgs/PointCloud forward_points

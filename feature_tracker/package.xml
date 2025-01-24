@@ -18,6 +18,8 @@
   <build_depend>sensor_msgs</build_depend>
   <build_depend>cv_bridge</build_depend>
   <build_depend>message_filters</build_depend>
+  <build_depend>cotracker_pkg</build_depend>
+  <exec_depend>cotracker_pkg</exec_depend>
 
   <!-- Runtime dependencies -->
   <run_depend>roscpp</run_depend>
