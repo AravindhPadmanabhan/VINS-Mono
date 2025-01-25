@@ -1,21 +1,21 @@
 #include "feature_tracker.h"
 
 
-pair<vector<cv::Point2f>, vector<uchar>> readResponse(const sensor_msgs::PointCloudConstPtr& msg)
+pair<vector<cv::Point2f>, vector<uchar>> readResponse(const sensor_msgs::PointCloud& msg)
 {
     // Vectors to store the extracted x, y, and status values
     vector<cv::Point2f> points2d;    // For storing (x, y) pairs
     vector<uchar> status_values;    // For storing status values (uchar)
 
-    if (msg->points.size() != msg->channels[0].values.size()) {
+    if (msg.points.size() != msg.channels[0].values.size()) {
         ROS_ERROR("Mismatch between points and channel values size in PointCloud!");
         return make_pair(points2d, status_values);
     }
 
     // Iterate over the points in the PointCloud
-    for (size_t i = 0; i < msg->points.size(); ++i) {
-        const geometry_msgs::Point32& point = msg->points[i];
-        float status = msg->channels[0].values[i];  // Assuming a single channel for status
+    for (size_t i = 0; i < msg.points.size(); i++) {
+        const geometry_msgs::Point32& point = msg.points[i];
+        float status = msg.channels[0].values[i];  // Assuming a single channel for status
 
         // Add the x, y coordinates to the vector
         points2d.emplace_back(point.x, point.y);
@@ -33,7 +33,6 @@ cotracker_pkg::cotracker createRequest(const vector<cv::Point2f>& queries, const
 
     if (queries.size() != removed_indices.size()) {
         ROS_ERROR("Size of queries and removed_indices must match!");
-        return;
     }
 
     // Create the PointCloud message
@@ -59,12 +58,14 @@ cotracker_pkg::cotracker createRequest(const vector<cv::Point2f>& queries, const
 
     // Create image message:
     sensor_msgs::Image img_msg;
+    cv::Mat bgr_img;
+    cv::cvtColor(img, bgr_img, cv::COLOR_GRAY2BGR);
     try {
         // Use cv_bridge to convert the cv::Mat to a ROS Image message
         cv_bridge::CvImage cv_img;
         cv_img.header = header;               // Use the provided header
         cv_img.encoding = sensor_msgs::image_encodings::BGR8; // Adjust encoding based on your image type
-        cv_img.image = img;                   // Assign the OpenCV image
+        cv_img.image = bgr_img;                   // Assign the OpenCV image
 
         // Convert to sensor_msgs::Image
         img_msg = *cv_img.toImageMsg();

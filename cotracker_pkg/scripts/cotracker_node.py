@@ -23,7 +23,8 @@ def create_pointcloud_msg(points, status, image_stamp):
         # Convert points and status to numpy arrays
         points = points.cpu().numpy()
         status = np.array(status.cpu(), dtype=np.float32)
-
+        # print("number of successful tracks: ", status.sum())
+        
         # Create a channel for status
         status_channel = ChannelFloat32()
         status_channel.name = "status"
@@ -75,11 +76,12 @@ class CoTrackerNode:
         forw_pts_msg = create_pointcloud_msg(forw_pts, status, msg.header.stamp)
 
         if self.debug:
+            # print("Video window: ", self.window.frame_numbers)
             debug_image = self.window.debug_tracks()
             ros_debug_image = self.bridge.cv2_to_imgmsg(debug_image, encoding='bgr8')
             self.debug_publisher.publish(ros_debug_image)
 
-        rospy.loginfo("Image processed and published.")
+        # rospy.loginfo("Image processed.")
         return forw_pts_msg
 
     def queries_callback(self, msg):
@@ -95,7 +97,8 @@ class CoTrackerNode:
             indices.append(int(channel_value))          # intensity (or other channel)
 
         self.window.update_queries(points, indices)
-        rospy.loginfo("Queries updated.")
+        # print(self.window.queries)
+        # rospy.loginfo("Queries updated.")
 
 
 if __name__ == '__main__':
