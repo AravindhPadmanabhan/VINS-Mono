@@ -13,6 +13,7 @@
 
 #include <sensor_msgs/PointCloud.h>
 #include <geometry_msgs/Point32.h>
+#include <cv_bridge/cv_bridge.h>
 
 #include "camodocal/camera_models/CameraFactory.h"
 #include "camodocal/camera_models/CataCamera.h"
@@ -32,7 +33,7 @@ bool inBorder(const cv::Point2f &pt);
 void reduceVector(vector<cv::Point2f> &v, vector<uchar> status);
 void reduceVector(vector<int> &v, vector<uchar> status); 
 
-pair<vector<cv::Point2f>, vector<uchar>> readResponse(const sensor_msgs::PointCloudConstPtr& msg);
+pair<vector<cv::Point2f>, vector<uchar>> readResponse(const sensor_msgs::PointCloud& msg);
 cotracker_pkg::cotracker createRequest(const vector<cv::Point2f>& queries, const vector<int>& removed_indices, const cv::Mat& img, const std_msgs::Header& header);
 
 class FeatureTracker

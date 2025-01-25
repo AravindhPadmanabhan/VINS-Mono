@@ -3,7 +3,7 @@
     <node
         pkg="cotracker_pkg"
         type="cotracker_node.py"
-        name="cotracker_node"
+        name="cotracker_service"
         output="screen">
         <!-- Remap topics -->
         <!-- <remap from="/input_image" to="/camera/image_raw" />

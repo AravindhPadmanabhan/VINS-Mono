@@ -6,22 +6,25 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   sensor_msgs
   cv_bridge
+  message_generation # Include this for custom messages/services
 )
 
-## Declare this package as a catkin package
-catkin_package(
-  CATKIN_DEPENDS message_runtime std_msgs
-)
-
+## Declare custom service files
 add_service_files(
   FILES
   cotracker.srv
 )
 
+## Generate added messages and services
 generate_messages(
   DEPENDENCIES
   std_msgs
   sensor_msgs
+)
+
+## Declare this package as a catkin package
+catkin_package(
+  CATKIN_DEPENDS message_runtime std_msgs sensor_msgs
 )
 
 ## Mark scripts for installation
@@ -30,4 +33,3 @@ catkin_install_python(PROGRAMS
   # scripts/window_tracker.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
-

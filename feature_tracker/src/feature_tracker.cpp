@@ -15,7 +15,7 @@ void reduceVector(vector<cv::Point2f> &v, vector<int> &indices, vector<uchar> st
     int j = 0;
     for (int i = 0; i < int(v.size()); i++) {
         if (status[i]) {
-            v[j++] = v[i];
+            v[j] = v[i];
             indices[j++] = indices[i];
         }
     }
@@ -126,7 +126,8 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
     vector<uchar> track_status;
     cotracker_pkg::cotracker srv = createRequest(n_pts, removed_indices, forw_img, header); // new_queries instead of n_pts? If not, remove new_queries.
     if (client_.call(srv)) {
-        const auto& forw_pts_msg = srv.response.forward_points;
+        const auto forw_pts_msg = srv.response.forward_points;
+        ROS_INFO_STREAM("n_pts: " << n_pts.size() << ", removed_indices: " << removed_indices.size() << ", forw_pts: " << forw_pts_msg.points.size());
         if (forw_pts_msg.points.size() > 0) {  // equivalent to cur_pts.size() > 0 as presence of cur_pts would imply presence of tracks of cur_pts
             auto result = readResponse(forw_pts_msg); // is the order of forw_pts preserved?
             forw_pts = result.first;
@@ -138,6 +139,8 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
         ROS_ERROR("Failed to call cotracker service.");
     }
 
+    removed_indices.clear();
+
     if (cur_pts.size() > 0)
     {
         TicToc t_o;
@@ -148,6 +151,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
         for (int i = 0; i < int(forw_pts.size()); i++)
             if (track_status[i] && !inBorder(forw_pts[i]))
                 track_status[i] = 0;
+        
         reduceVector(prev_pts, track_status);
         reduceVector(cur_pts, track_status);
         reduceVector(forw_pts, indices, track_status);
@@ -156,16 +160,19 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
         reduceVector(track_cnt, track_status);
         ROS_DEBUG("temporal optical flow costs: %fms", t_o.toc());
     }
+    ROS_INFO_STREAM("Tracks: " << forw_pts.size());
 
     for (auto &n : track_cnt)
         n++;
 
     if (PUB_THIS_FRAME)
     {
-        rejectWithF(indices);
+        // rejectWithF(indices);
         ROS_DEBUG("set mask begins");
+        ROS_INFO_STREAM("RANSAC: " << forw_pts.size());
         TicToc t_m;
         setMask(indices);
+        ROS_INFO_STREAM("Mask: " << forw_pts.size());
         ROS_DEBUG("set mask costs %fms", t_m.toc());
 
         ROS_DEBUG("detect feature begins");
@@ -228,7 +235,7 @@ void FeatureTracker::rejectWithF(vector<int> &indices)
         }
 
         vector<uchar> status;
-        cv::findFundamentalMat(un_cur_pts, un_forw_pts, cv::FM_RANSAC, F_THRESHOLD, 0.99, status);
+        cv::findFundamentalMat(un_cur_pts, un_forw_pts, cv::FM_RANSAC, F_THRESHOLD, 0.9, status);
         int size_a = cur_pts.size();
         reduceVector(prev_pts, status);
         reduceVector(cur_pts, status);

@@ -3,7 +3,6 @@
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/Imu.h>
 #include <std_msgs/Bool.h>
-#include <cv_bridge/cv_bridge.h>
 
 #include "feature_tracker.h"
 
@@ -58,6 +57,8 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
     }
     else
         PUB_THIS_FRAME = false;
+
+    // ROS_INFO_STREAM("Raw image encoding: " << img_msg->encoding);
 
     cv_bridge::CvImageConstPtr ptr;
     if (img_msg->encoding == "8UC1")
@@ -225,9 +226,9 @@ int main(int argc, char **argv)
         }
     }
 
-    ros::service::waitForService("cotracker");
+    ros::service::waitForService("/cotracker");
     for (int i = 0; i < NUM_OF_CAM; i++)
-        trackerData[0].client_ = n.serviceClient<cotracker_pkg::cotracker>("cotracker");
+        trackerData[i].client_ = n.serviceClient<cotracker_pkg::cotracker>("/cotracker");
 
 
     ros::Subscriber sub_img = n.subscribe(IMAGE_TOPIC, 100, img_callback);
