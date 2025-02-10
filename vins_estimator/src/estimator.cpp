@@ -270,7 +270,7 @@ bool Estimator::initialStructure()
     int l;
     if (!relativePose(relative_R, relative_T, l))
     {
-        ROS_INFO("Not enough features or parallax; Move device around");
+        ROS_WARN("Not enough features or parallax; Move device around");
         return false;
     }
     GlobalSFM sfm;
@@ -278,7 +278,7 @@ bool Estimator::initialStructure()
               relative_R, relative_T,
               sfm_f, sfm_tracked_points))
     {
-        ROS_DEBUG("global SFM failed!");
+        ROS_WARN("global SFM failed!");
         marginalization_flag = MARGIN_OLD;
         return false;
     }
@@ -333,12 +333,12 @@ bool Estimator::initialStructure()
         if(pts_3_vector.size() < 6)
         {
             cout << "pts_3_vector size " << pts_3_vector.size() << endl;
-            ROS_DEBUG("Not enough points for solve pnp !");
+            ROS_WARN("Not enough points for solve pnp !");
             return false;
         }
         if (! cv::solvePnP(pts_3_vector, pts_2_vector, K, D, rvec, t, 1))
         {
-            ROS_DEBUG("solve pnp fail!");
+            ROS_WARN("solve pnp fail!");
             return false;
         }
         cv::Rodrigues(rvec, r);
@@ -355,7 +355,7 @@ bool Estimator::initialStructure()
         return true;
     else
     {
-        ROS_INFO("misalign visual structure with IMU");
+        ROS_WARN("misalign visual structure with IMU");
         return false;
     }
 
