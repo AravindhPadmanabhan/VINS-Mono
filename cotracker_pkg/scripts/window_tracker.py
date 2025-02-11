@@ -1,22 +1,22 @@
 from cv_bridge import CvBridge
-from cotracker.predictor import CoTrackerOnlinePredictor
+from cotracker.predictor import CoTrackerPredictor
 import torch
 import numpy as np
 import cv2
 
 class CoTrackerWindow:
     def __init__(self, checkpoint, device='cuda'):
-        self.model = CoTrackerOnlinePredictor(checkpoint=checkpoint)
+        self.model = CoTrackerPredictor(checkpoint=checkpoint)
         self.model.to(device)
         self.video = []
         self.frame_numbers = []
         self.frame_no = 1
-        self.video_len = self.model.model.window_len + self.model.step
+        self.video_len = 24
         # self.video_padded = None
         self.max_queries = 100
         self.queries = None
         self.cur_tracks = None
-        self.track_status = torch.ones(self.max_queries, dtype=torch.bool).to(device)
+        # self.track_status = torch.ones(self.max_queries, dtype=torch.bool).to(device)
         self.new_queries = None
         self.device = device
 
@@ -27,11 +27,11 @@ class CoTrackerWindow:
         self.video.append(img_tensor)
         self.frame_numbers.append(self.frame_no)
         if len(self.video) == 1:
-            self.video = self.video + [self.video[-1]] * (self.video_len - len(self.video))
-            self.frame_numbers = self.frame_numbers + [self.frame_numbers[-1]] * (self.video_len - len(self.frame_numbers))
+            self.video.extend([self.video[0]] * (self.video_len - 1))
+            self.frame_numbers.extend([self.frame_numbers[0]] * (self.video_len - 1))
         if len(self.video) > self.video_len:
-            self.video.pop(0)
-            self.frame_numbers.pop(0)
+            self.video = self.video[-self.video_len:]
+            self.frame_numbers = self.frame_numbers[-self.video_len:]
         self.frame_no += 1
 
     def update_queries(self, new_points, removed_indices):
@@ -58,35 +58,18 @@ class CoTrackerWindow:
             self.queries = torch.where(out_of_window_mask.unsqueeze(-1), traces, self.queries)
 
     def track(self):
-        
         if self.queries is None:
             return None, None
 
-        is_first_step = True
-        for i in range(3):
-            video_chunk = self.video[:(i+1)*self.model.step]
-            window_frames = video_chunk[-self.model.model.window_len:]
-            window_frames = torch.stack(window_frames).to(self.device).unsqueeze(0)
-            tracks, vis, conf = self.model(window_frames, is_first_step=is_first_step, queries=self.queries)
-            if is_first_step:
-                is_first_step = False
+        window_frames = torch.stack(self.video).to(self.device).unsqueeze(0)
+        assert (window_frames.shape[1] == self.video_len) and (window_frames.shape[2] == 3), "Input video length does not match required length"
+        tracks, vis = self.model(window_frames, queries=self.queries, backward_tracking=True)
 
-        self.track_status = ((conf[0,-1,:] > 0.6) * vis[0,-1,:]) == 1
+        # self.track_status = vis
         self.cur_tracks = tracks
+        print("vis shape: ", vis.shape)
 
-        return tracks[0,-1,:,:], self.track_status
-    
-    def debug_features(self):
-        # Mark the queries on the image
-        query_frame = self.video[0]
-        query_frame_np = query_frame.permute(1, 2, 0).cpu().numpy()
-        query_frame_np = query_frame_np.astype(np.uint8)
-        query_frame_np = cv2.cvtColor(query_frame_np, cv2.COLOR_RGB2BGR)
-        for query in self.queries[0]:
-            x, y = int(query[1]), int(query[2])
-            cv2.circle(query_frame_np, (x, y), 5, (0, 255, 0), -1)
-
-        return query_frame_np
+        return tracks[0,-1,:,:], vis[0,-1]
     
     def debug_tracks(self):
         latest_frame = self.video[-2]
@@ -101,10 +84,5 @@ class CoTrackerWindow:
                     cv2.circle(latest_frame_np, (x, y), 5, (0, 255, 0), -1)
                 else:
                     cv2.circle(latest_frame_np, (x, y), 5, (255, 0, 0), -1)
-
-        # if self.new_queries is not None:
-        #     for query in self.new_queries[0]:
-        #         x, y = int(query[1]), int(query[2])
-        #         cv2.circle(latest_frame_np, (x, y), 5, (0, 0, 255), -1)
 
         return latest_frame_np
