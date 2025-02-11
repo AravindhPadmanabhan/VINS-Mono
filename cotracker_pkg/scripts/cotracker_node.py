@@ -53,7 +53,7 @@ class CoTrackerNode:
         self.bridge = CvBridge()
 
         # Initialize the CoTrackerWindow object
-        self.window = CoTrackerWindow(checkpoint='/home/co-tracker/checkpoints/scaled_online.pth', device='cuda')
+        self.window = CoTrackerWindow(checkpoint='/home/co-tracker/checkpoints/scaled_offline.pth', device='cuda')
         self.debug = True
 
         rospy.loginfo("CoTracker Node is running.")
