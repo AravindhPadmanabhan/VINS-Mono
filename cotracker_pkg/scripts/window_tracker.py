@@ -56,6 +56,7 @@ class CoTrackerWindow:
             out_of_window_mask = self.queries[0, :, 0] < 0
             traces = torch.cat((torch.zeros(1,self.max_queries,1).to(self.device), self.cur_tracks[:,1,:,:]), dim=-1)
             self.queries = torch.where(out_of_window_mask.unsqueeze(-1), traces, self.queries)
+            self.queries = torch.round(self.queries)
 
     def track(self):
         if self.queries is None:
