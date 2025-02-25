@@ -10,70 +10,50 @@ class CoTrackerWindow:
         self.model = CoTrackerOnlinePredictor(checkpoint=checkpoint)
         self.offline_model = CoTrackerPredictor(checkpoint=checkpoint)
         self.model.to(device)
+
         self.video = []
         self.frame_numbers = []
         self.frame_no = -1
         self.video_len = 9
-        # self.video_padded = None
+
         self.max_queries = 100
         self.queries = None
-        self.cur_tracks = None
-        # self.track_status = torch.ones(self.max_queries, dtype=torch.bool).to(device)
         self.new_queries = None
-        self.device = device
-        self.initialized = False
         self.removed_indices = None
+        self.cur_tracks = None
+
+        self.initialized = False
         self.is_first_step = True
+        self.device = device
 
     def add_image(self, image):
         img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         img_tensor = torch.tensor(img_rgb, dtype=torch.float32).permute(2, 0, 1)
-        # print(img_tensor)
         self.video.append(img_tensor)
         self.frame_no += 1
         self.frame_numbers.append(self.frame_no)
-        if len(self.video) == 1:
-            self.video.extend([self.video[0]] * (self.video_len - 1))
-            self.frame_numbers.extend([self.frame_numbers[0]] * (self.video_len - 1))
+
         if len(self.video) > self.video_len:
             self.video = self.video[-self.video_len:]
             self.frame_numbers = self.frame_numbers[-self.video_len:]
         if self.frame_no == self.video_len - 1:
             self.initialized = True
 
-    def update_queries(self, new_points, removed_indices):
-        if not self.initialized:    
-            if len(removed_indices) > 0:
-                new_points = torch.tensor(new_points, dtype=torch.float32).to(self.device)  # Shape: (N,2)
-                frame = torch.ones(new_points.shape[0], 1).to(self.device) * (self.video_len - 1)  # Shape: (N,1)
-                self.new_queries = torch.cat((frame, new_points), dim=1).unsqueeze(0)  # Shape: (1,N,3)
-                if self.queries is None:
-                    self.queries = self.new_queries
-                    self.max_queries = self.queries.shape[1]
-                else:
-                    mask = torch.ones(self.queries.shape[1], dtype=torch.bool)  # Create a mask for all points
-                    mask[removed_indices] = False
-                    self.queries = self.queries[:, mask, :]
-                    self.queries = torch.cat((self.queries, self.new_queries), dim=1)
+    def update_queries(self, new_points, removed_indices): 
+        if len(removed_indices) > 0:
+            new_points = torch.tensor(new_points, dtype=torch.float32).to(self.device)  # Shape: (N,2)
+            frame = torch.ones(new_points.shape[0], 1).to(self.device) * self.frame_no  # Shape: (N,1)
+            self.new_queries = torch.cat((frame, new_points), dim=1).unsqueeze(0)  # Shape: (1,N,3)
+            if self.queries is None:
+                self.queries = self.new_queries
+                self.max_queries = self.queries.shape[1]
             else:
-                self.new_queries = torch.zeros(1,0,3).to(self.device)
-        
-            # Move queries behind by one frame:
-            self.queries[0, :, 0] -= 1
-
-        else:
-            self.removed_indices = removed_indices
-            if len(removed_indices) > 0:
-                new_points = torch.tensor(new_points, dtype=torch.float32).to(self.device)
-                frame = torch.ones(new_points.shape[0], 1).to(self.device) * (self.frame_no-1)
-                self.new_queries = torch.cat((frame, new_points), dim=1).unsqueeze(0)
-
                 mask = torch.ones(self.queries.shape[1], dtype=torch.bool)  # Create a mask for all points
                 mask[removed_indices] = False
                 self.queries = self.queries[:, mask, :]
                 self.queries = torch.cat((self.queries, self.new_queries), dim=1)
-            else:
-                self.new_queries = torch.zeros(1,0,3).to(self.device)
+        else:
+            self.new_queries = torch.zeros(1,0,3).to(self.device)
 
     def track(self):
         if self.queries is None:
