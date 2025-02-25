@@ -53,7 +53,9 @@ class CoTrackerNode:
         self.bridge = CvBridge()
 
         # Initialize the CoTrackerWindow object
-        self.window = CoTrackerWindow(checkpoint='/home/co-tracker/checkpoints/scaled_offline.pth', device='cuda')
+        self.window = CoTrackerWindow(checkpoint='/home/co-tracker/checkpoints/scaled_online.pth',
+                                      offline_checkpoint='/home/co-tracker/checkpoints/scaled_offline.pth',
+                                      device='cuda')
         self.debug = True
 
         rospy.loginfo("CoTracker Node is running.")
@@ -65,6 +67,12 @@ class CoTrackerNode:
             
         self.queries_callback(request.new_queries)
         forward_points_msg = self.image_callback(request.image)
+
+        if self.debug:
+            debug_image = self.window.debug_tracks()
+            ros_debug_image = self.bridge.cv2_to_imgmsg(debug_image, encoding='bgr8')
+            self.debug_publisher.publish(ros_debug_image)
+        
         return cotrackerResponse(forward_points_msg)
 
     def image_callback(self, msg):
@@ -74,14 +82,6 @@ class CoTrackerNode:
         self.window.add_image(cv_image)
         forw_pts, status = self.window.track()            
         forw_pts_msg = create_pointcloud_msg(forw_pts, status, msg.header.stamp)
-
-        if self.debug:
-            # print("Video window: ", self.window.frame_numbers)
-            debug_image = self.window.debug_tracks()
-            ros_debug_image = self.bridge.cv2_to_imgmsg(debug_image, encoding='bgr8')
-            self.debug_publisher.publish(ros_debug_image)
-
-        # rospy.loginfo("Image processed.")
         return forw_pts_msg
 
     def queries_callback(self, msg):
