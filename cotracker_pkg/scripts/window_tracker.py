@@ -6,10 +6,11 @@ import numpy as np
 import cv2
 
 class CoTrackerWindow:
-    def __init__(self, checkpoint, device='cuda'):
+    def __init__(self, checkpoint, offline_checkpoint, device='cuda'):
         self.model = CoTrackerOnlinePredictor(checkpoint=checkpoint)
-        self.offline_model = CoTrackerPredictor(checkpoint=checkpoint)
+        self.offline_model = CoTrackerPredictor(checkpoint=offline_checkpoint)
         self.model.to(device)
+        self.offline_model.to(device)
 
         self.video = []
         self.frame_numbers = []
@@ -38,8 +39,10 @@ class CoTrackerWindow:
             self.frame_numbers = self.frame_numbers[-self.video_len:]
         if self.frame_no == self.video_len - 1:
             self.initialized = True
+            print("Initialization done. Switching to online mode!")
 
     def update_queries(self, new_points, removed_indices): 
+        self.removed_indices = removed_indices
         if len(removed_indices) > 0:
             new_points = torch.tensor(new_points, dtype=torch.float32).to(self.device)  # Shape: (N,2)
             frame = torch.ones(new_points.shape[0], 1).to(self.device) * self.frame_no  # Shape: (N,1)
@@ -60,17 +63,18 @@ class CoTrackerWindow:
             return None, None
 
         window_frames = torch.stack(self.video).to(self.device).unsqueeze(0)
-        assert (window_frames.shape[1] == self.video_len) and (window_frames.shape[2] == 3), "Input video length does not match required length"
 
         if not self.initialized:
+            assert (window_frames.shape[1] == self.frame_no + 1) and (window_frames.shape[2] == 3), "Input video length does not match required length"
             tracks, vis = self.offline_model(window_frames, queries=self.queries, backward_tracking=False)
         else:
-            tracks, vis = self.model(window_frames, self.is_first_step, queries=self.queries, removed_indices=self.removed_indices)
+            assert (window_frames.shape[1] == self.video_len) and (window_frames.shape[2] == 3), "Input video length does not match required length"
+            tracks, vis, _ = self.model(window_frames, self.is_first_step, queries=self.queries, removed_indices=self.removed_indices)
             self.is_first_step = False
 
         # self.track_status = vis
         self.cur_tracks = tracks
-        print("vis shape: ", vis.shape)
+        print("tracks shape: ", tracks.shape)
 
         return tracks[0,-1,:,:], vis[0,-1]
     
@@ -79,7 +83,6 @@ class CoTrackerWindow:
         latest_frame_np = latest_frame.permute(1, 2, 0).cpu().numpy()
         latest_frame_np = latest_frame_np.astype(np.uint8)
         latest_frame_np = cv2.cvtColor(latest_frame_np, cv2.COLOR_RGB2BGR)
-
         if self.cur_tracks is not None:
             for i in range(self.max_queries):
                 x, y = int(self.cur_tracks[0,-2,i,0]), int(self.cur_tracks[0,-2,i,1])
