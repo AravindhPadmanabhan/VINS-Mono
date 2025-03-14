@@ -65,7 +65,7 @@ class CoTrackerNode:
             forward_points_msg = self.image_callback(request.image)
             return cotrackerResponse(forward_points_msg)
             
-        self.queries_callback(request.new_queries)
+        self.queries_callback(request.queries, request.removed_indices)
         forward_points_msg = self.image_callback(request.image)
 
         if self.debug:
@@ -84,17 +84,16 @@ class CoTrackerNode:
         forw_pts_msg = create_pointcloud_msg(forw_pts, status, msg.header.stamp)
         return forw_pts_msg
 
-    def queries_callback(self, msg):
+    def queries_callback(self, new_queries, removed_indices):
         # Extract points and additional channel from the PointCloud2 message
         points = []
         indices = []
-        if not msg.channels or len(msg.channels[0].values) != len(msg.points):
-            rospy.logwarn("PointCloud message has inconsistent channels or no data.")
-            return
         
-        for point, channel_value in zip(msg.points, msg.channels[0].values):
+        for point in new_queries:
             points.append([point.x, point.y])  # Extract x, y
-            indices.append(int(channel_value))          # intensity (or other channel)
+        
+        for index in removed_indices:
+            indices.append(index)
 
         self.window.update_queries(points, indices)
         # print(self.window.queries)
