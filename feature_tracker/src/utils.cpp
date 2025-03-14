@@ -32,29 +32,26 @@ cotracker_pkg::cotracker createRequest(const vector<cv::Point2f>& queries, const
     cotracker_pkg::cotracker srv;
 
     if (queries.size() != removed_indices.size()) {
-        ROS_ERROR("Size of queries and removed_indices must match!");
+        ROS_DEBUG("Size of queries and removed_indices are different: %lu and %lu", queries.size(), removed_indices.size());
     }
 
-    // Create the PointCloud message
-    sensor_msgs::PointCloud pointcloud_msg;
-    pointcloud_msg.header = header;
+    srv.request.queries.clear();
+    srv.request.removed_indices.clear();
 
-    // Resize the points and channels
-    pointcloud_msg.points.resize(queries.size());
-    pointcloud_msg.channels.resize(1);  // Assuming a single channel for indices
-    pointcloud_msg.channels[0].name = "indices";
-    pointcloud_msg.channels[0].values.resize(queries.size());
-
-    // Fill the points and channels
-    for (size_t i = 0; i < queries.size(); ++i) {
-        // Assign x, y, z coordinates
-        pointcloud_msg.points[i].x = queries[i].x;
-        pointcloud_msg.points[i].y = queries[i].y;
-        pointcloud_msg.points[i].z = 0.0;  // Set z = 0
-
-        // Store the channel value
-        pointcloud_msg.channels[0].values[i] = static_cast<float>(removed_indices[i]);
+    for (int i = 0; i < static_cast<int>(queries.size()); i++) {
+        geometry_msgs::Point32 p;
+        p.x = queries[i].x;
+        p.y = queries[i].y;
+        p.z = 1;
+        srv.request.queries.push_back(p);
     }
+
+    for (int i = 0; i < static_cast<int>(removed_indices.size()); i++) {
+        srv.request.removed_indices.push_back(removed_indices[i]);
+    }
+
+    ROS_INFO_STREAM("New queries: " << queries.size() << ", Removed indices: " << removed_indices.size());
+    
 
     // Create image message:
     sensor_msgs::Image img_msg;
@@ -75,8 +72,6 @@ cotracker_pkg::cotracker createRequest(const vector<cv::Point2f>& queries, const
     }
 
     srv.request.image = img_msg;          // Assign the image message
-    srv.request.new_queries = pointcloud_msg;
 
     return srv;
 }
-

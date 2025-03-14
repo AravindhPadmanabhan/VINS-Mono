@@ -126,6 +126,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
 
     forw_pts.clear();
     vector<int> indices; // indices of forw_pts. Keeps track of which forw_pts are rejected so that they can be replaced by n_pts in the server.
+    int num_queries = 0;
 
     // Call the service
     vector<uchar> track_status;
@@ -139,12 +140,14 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
             track_status = result.second;
             for(int i=0; i<forw_pts.size(); i++)
                 indices.push_back(i);
+            num_queries = forw_pts.size();
         }
     } else {
         ROS_ERROR("Failed to call cotracker service.");
     }
 
     removed_indices.clear();
+    n_pts.clear();
 
     if (cur_pts.size() > 0)
     {
@@ -193,8 +196,6 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
                 cout << "wrong size " << endl;
             cv::goodFeaturesToTrack(forw_img, n_pts, MAX_CNT - forw_pts.size(), 0.01, MIN_DIST, mask);
         }
-        else
-            n_pts.clear();
         ROS_DEBUG("detect feature costs: %fms", t_t.toc());
 
         ROS_DEBUG("add feature begins");
@@ -211,7 +212,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
     prev_time = cur_time;
 
     std::unordered_set<int> indices_set(indices.begin(), indices.end());
-    for (int i=0; i<MAX_CNT; i++) {
+    for (int i=0; i<num_queries; i++) {
         if (indices_set.find(i) == indices_set.end()) {
             removed_indices.push_back(i);
         }

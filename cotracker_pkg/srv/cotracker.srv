@@ -1,6 +1,7 @@
 # Request
 sensor_msgs/Image image
-sensor_msgs/PointCloud new_queries
+geometry_msgs/Point32[] queries
+int32[] removed_indices
 
 ---
 # Response
