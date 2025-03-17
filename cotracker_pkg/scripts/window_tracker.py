@@ -72,16 +72,18 @@ class CoTrackerWindow:
         if not self.initialized:
             assert (window_frames.shape[1] == self.frame_no + 1) and (window_frames.shape[2] == 3), "Input video length does not match required length"
             tracks, vis = self.offline_model(window_frames, queries=self.queries, backward_tracking=True)
+            status = vis[0,-1]
         else:
             assert (window_frames.shape[1] == self.video_len) and (window_frames.shape[2] == 3), "Input video length does not match required length"
-            tracks, vis, _ = self.model(window_frames, self.is_first_step, queries=self.queries, removed_indices=self.removed_indices, new_queries_num=self.new_queries.shape[1])
+            tracks, vis, conf = self.model(window_frames, self.is_first_step, queries=self.queries, removed_indices=self.removed_indices, new_queries_num=self.new_queries.shape[1])
             self.is_first_step = False
+            status = conf[0,-1]
 
         # self.track_status = vis
         self.cur_tracks = tracks
         print("tracks shape: ", tracks.shape)
 
-        return tracks[0,-1,:,:], vis[0,-1]
+        return tracks[0,-1,:,:], status
     
     def debug_tracks(self):
         latest_frame = self.video[-2]
