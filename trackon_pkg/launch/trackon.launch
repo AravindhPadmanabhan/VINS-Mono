@@ -1,9 +1,9 @@
 <launch>
     <!-- Launch the image_processor_node -->
     <node
-        pkg="cotracker_pkg"
-        type="cotracker_node.py"
-        name="cotracker_service"
+        pkg="trackon_pkg"
+        type="trackon_node.py"
+        name="trackon_service"
         output="log">
         <!-- Remap topics -->
         <!-- <remap from="/input_image" to="/camera/image_raw" />

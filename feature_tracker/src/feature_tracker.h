@@ -19,7 +19,7 @@
 #include "camodocal/camera_models/CataCamera.h"
 #include "camodocal/camera_models/PinholeCamera.h"
 
-#include <cotracker_pkg/cotracker.h>
+#include <trackon_pkg/trackon.h>
 
 #include "parameters.h"
 #include "tic_toc.h"
@@ -34,7 +34,7 @@ void reduceVector(vector<cv::Point2f> &v, vector<uchar> status);
 void reduceVector(vector<int> &v, vector<uchar> status); 
 
 pair<vector<cv::Point2f>, vector<uchar>> readResponse(const sensor_msgs::PointCloud& msg);
-cotracker_pkg::cotracker createRequest(const vector<cv::Point2f>& queries, const vector<int>& removed_indices, const cv::Mat& img, const std_msgs::Header& header);
+trackon_pkg::trackon createRequest(const vector<cv::Point2f>& queries, const vector<int>& removed_indices, const cv::Mat& img, const std_msgs::Header& header);
 
 class FeatureTracker
 {

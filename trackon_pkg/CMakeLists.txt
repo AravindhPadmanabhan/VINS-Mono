@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(cotracker_pkg)
+project(trackon_pkg)
 
 ## Find dependencies
 find_package(catkin REQUIRED COMPONENTS
@@ -12,7 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## Declare custom service files
 add_service_files(
   FILES
-  cotracker.srv
+  trackon.srv
 )
 
 ## Generate added messages and services
@@ -29,7 +29,7 @@ catkin_package(
 
 ## Mark scripts for installation
 catkin_install_python(PROGRAMS
-  scripts/cotracker_node.py
+  scripts/trackon_node.py
   # scripts/window_tracker.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
