@@ -226,9 +226,9 @@ int main(int argc, char **argv)
         }
     }
 
-    ros::service::waitForService("/cotracker");
+    ros::service::waitForService("/trackon");
     for (int i = 0; i < NUM_OF_CAM; i++)
-        trackerData[i].client_ = n.serviceClient<cotracker_pkg::cotracker>("/cotracker");
+        trackerData[i].client_ = n.serviceClient<trackon_pkg::trackon>("/trackon");
 
 
     ros::Subscriber sub_img = n.subscribe(IMAGE_TOPIC, 100, img_callback);

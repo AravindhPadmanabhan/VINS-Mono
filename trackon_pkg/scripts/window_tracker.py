@@ -1,22 +1,18 @@
 from cv_bridge import CvBridge
-from cotracker.predictor import CoTrackerPredictor
-from cotracker.predictor_update import CoTrackerOnlinePredictor
+from trackon.track_on_ff import TrackOnFF
+from trackon.track_on_cfg import TrackOnCfg
 import torch
 import numpy as np
 import cv2
 
-class CoTrackerWindow:
-    def __init__(self, checkpoint, offline_checkpoint, device='cuda'):
-        self.model = CoTrackerOnlinePredictor(checkpoint=checkpoint, local_grid_size=0, local_grid_extent=0)
-        self.offline_model = CoTrackerPredictor(checkpoint=offline_checkpoint)
+class TrackOnWindow:
+    def __init__(self, checkpoint, device='cuda'):
+        args = TrackOnCfg(checkpoint_path=checkpoint)
+        self.model = TrackOnFF(args)
         self.model.to(device)
-        self.offline_model.to(device)
         self.device = device
 
-        self.video = []
-        self.frame_numbers = []
         self.frame_no = -1
-        self.video_len = 9
 
         self.max_queries = 100
         self.queries = torch.zeros(1,0,3).to(self.device)
@@ -24,23 +20,9 @@ class CoTrackerWindow:
         self.removed_indices = None
         self.cur_tracks = None
 
-        self.initialized = False
         self.is_first_step = True
-
-    def add_image(self, image):
-        img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        img_tensor = torch.tensor(img_rgb, dtype=torch.float32).permute(2, 0, 1)
-        self.video.append(img_tensor)
-        self.frame_no += 1
-        self.frame_numbers.append(self.frame_no)
-
-        if len(self.video) > self.video_len:
-            self.video = self.video[-self.video_len:]
-            self.frame_numbers = self.frame_numbers[-self.video_len:]
-        if self.frame_no == self.video_len - 1:
-            self.initialized = True
-            print("Initialization done. Switching to online mode!")
-
+        self.init_img = None
+        
     def update_queries(self, new_points, removed_indices): 
         init_queries = self.queries.shape[1]
         self.removed_indices = removed_indices
@@ -62,22 +44,32 @@ class CoTrackerWindow:
         
         self.queries = torch.cat((self.queries, self.new_queries), dim=1)
         assert init_queries + len(new_points) - len(removed_indices) == self.queries.shape[1], "Queries update failed"
-        
-    def track(self):
-        if self.queries.shape[1] == 0:
-            return None, None
 
-        window_frames = torch.stack(self.video).to(self.device).unsqueeze(0)
+    def init_image(self, image):
+        # if self.queries.shape[1] == 0:
+        #     return None, None
 
-        if not self.initialized:
-            assert (window_frames.shape[1] == self.frame_no + 1) and (window_frames.shape[2] == 3), "Input video length does not match required length"
-            tracks, vis = self.offline_model(window_frames, queries=self.queries, backward_tracking=True)
-            status = vis[0,-1]
-        else:
-            assert (window_frames.shape[1] == self.video_len) and (window_frames.shape[2] == 3), "Input video length does not match required length"
-            tracks, vis, conf = self.model(window_frames, self.is_first_step, queries=self.queries, removed_indices=self.removed_indices, new_queries_num=self.new_queries.shape[1])
+        img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        img_tensor = torch.tensor(img_rgb, dtype=torch.float32).permute(2, 0, 1).unsqueeze(0).to(self.device)  # Shape: (1,3,H,W)
+        self.frame_no += 1
+        self.init_img = img_tensor
+
+    def track(self, image):
+
+        img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        img_tensor = torch.tensor(img_rgb, dtype=torch.float32).permute(2, 0, 1).unsqueeze(0).to(self.device)  # Shape: (1,3,H,W)
+        self.frame_no += 1
+
+        assert img_tensor.shape[1] == 3
+        if self.is_first_step:
+            self.model.init_queries_and_memory(self.queries.squeeze(0), self.init_img)
+            __ = self.model.ff_forward(self.init_img)
+            self.model.update_queries_and_memory(self.queries.squeeze(0), img_tensor)
             self.is_first_step = False
-            status = conf[0,-1]
+        else:
+            self.model.update_queries_and_memory(self.queries.squeeze(0), img_tensor)
+        tracks, vis, conf = self.model.ff_forward(img_tensor)
+        status = conf[0,-1]
 
         # self.track_status = vis
         self.cur_tracks = tracks
