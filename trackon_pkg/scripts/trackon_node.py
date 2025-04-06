@@ -53,7 +53,7 @@ class TrackOnNode:
         self.bridge = CvBridge()
 
         # Initialize the TrackOnWindow object
-        self.window = TrackOnWindow(checkpoint='/home/trackon/checkpoints/track_on_checkpoint.pt',
+        self.window = TrackOnWindow(checkpoint='/home/track_on/checkpoints/track_on_checkpoint.pt',
                                       device='cuda')
         self.debug = True
 

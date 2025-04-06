@@ -5,11 +5,16 @@ import torch
 import numpy as np
 import cv2
 
+from load_checkpoint import restart_from_checkpoint_not_dist
+
 class TrackOnWindow:
     def __init__(self, checkpoint, device='cuda'):
         args = TrackOnCfg(checkpoint_path=checkpoint)
         self.model = TrackOnFF(args)
-        self.model.to(device)
+        restart_from_checkpoint_not_dist(args, run_variables={}, model=self.model)
+        self.model.to(device).eval()
+        self.model.set_memory_size(args.val_memory_size, args.val_memory_size)
+        self.model.visibility_treshold = args.val_vis_delta
         self.device = device
 
         self.frame_no = -1
@@ -22,6 +27,7 @@ class TrackOnWindow:
 
         self.is_first_step = True
         self.init_img = None
+        self.latest_img = None
         
     def update_queries(self, new_points, removed_indices): 
         init_queries = self.queries.shape[1]
@@ -59,32 +65,31 @@ class TrackOnWindow:
         img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         img_tensor = torch.tensor(img_rgb, dtype=torch.float32).permute(2, 0, 1).unsqueeze(0).to(self.device)  # Shape: (1,3,H,W)
         self.frame_no += 1
+        self.latest_img = img_tensor
 
         assert img_tensor.shape[1] == 3
-        if self.is_first_step:
-            self.model.init_queries_and_memory(self.queries.squeeze(0), self.init_img)
-            __ = self.model.ff_forward(self.init_img)
-            self.model.update_queries_and_memory(self.queries.squeeze(0), img_tensor)
-            self.is_first_step = False
-        else:
-            self.model.update_queries_and_memory(self.queries.squeeze(0), img_tensor)
-        tracks, vis, conf = self.model.ff_forward(img_tensor)
-        status = conf[0,-1]
 
-        # self.track_status = vis
+        with torch.no_grad():
+            if self.is_first_step:
+                self.model.init_queries_and_memory(self.queries.squeeze(0), self.init_img)
+                __ = self.model.ff_forward(self.init_img)
+                self.model.update_queries_and_memory(self.queries.squeeze(0), img_tensor, self.removed_indices)
+                self.is_first_step = False
+            else:
+                self.model.update_queries_and_memory(self.queries.squeeze(0), img_tensor, self.removed_indices)
+            tracks, vis, conf = self.model.ff_forward(img_tensor)
+
+            # self.track_status = vis
         self.cur_tracks = tracks
-        print("tracks shape: ", tracks.shape)
-
-        return tracks[0,-1,:,:], status
+        return tracks, vis
     
     def debug_tracks(self):
-        latest_frame = self.video[-2]
-        latest_frame_np = latest_frame.permute(1, 2, 0).cpu().numpy()
+        latest_frame_np = self.latest_img.squeeze(0).permute(1, 2, 0).cpu().numpy()
         latest_frame_np = latest_frame_np.astype(np.uint8)
         latest_frame_np = cv2.cvtColor(latest_frame_np, cv2.COLOR_RGB2BGR)
         if self.cur_tracks is not None:
             for i in range(self.queries.shape[1]):
-                x, y = int(self.cur_tracks[0,-2,i,0]), int(self.cur_tracks[0,-2,i,1])
+                x, y = int(self.cur_tracks[i,0]), int(self.cur_tracks[i,1])
                 if i < self.queries.shape[1] - self.new_queries.shape[1]:
                     cv2.circle(latest_frame_np, (x, y), 5, (0, 255, 0), -1)
                 else:
