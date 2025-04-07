@@ -15,6 +15,7 @@ class TrackOnWindow:
         self.model.to(device).eval()
         self.model.set_memory_size(args.val_memory_size, args.val_memory_size)
         self.model.visibility_treshold = args.val_vis_delta
+        self.model.confidence_treshold = 0.8
         self.device = device
 
         self.frame_no = -1
@@ -71,6 +72,13 @@ class TrackOnWindow:
 
         with torch.no_grad():
             if self.is_first_step:
+                if self.queries.shape[1] == 0:
+                    self.init_img = img_tensor
+                    self.frame_no = 0
+                    # self.frame_no -= 1
+                    # self.is_first_step = True
+                    print("No queries provided, skipping tracking.")
+                    return None, None
                 self.model.init_queries_and_memory(self.queries.squeeze(0), self.init_img)
                 __ = self.model.ff_forward(self.init_img)
                 self.model.update_queries_and_memory(self.queries.squeeze(0), img_tensor, self.removed_indices)
@@ -81,7 +89,7 @@ class TrackOnWindow:
 
             # self.track_status = vis
         self.cur_tracks = tracks
-        return tracks, vis
+        return tracks, conf
     
     def debug_tracks(self):
         latest_frame_np = self.latest_img.squeeze(0).permute(1, 2, 0).cpu().numpy()
