@@ -10,8 +10,8 @@ import numpy as np
 
 sys.path.append(os.path.dirname(__file__))
 
-from cotracker_pkg.srv import cotracker, cotrackerResponse 
-from window_tracker import CoTrackerWindow
+from tapnext_pkg.srv import tapnext, tapnextResponse 
+from tapnext_pkg.scripts.tapnext_tracker import TAPNextTracker
 
 def create_pointcloud_msg(points, status, image_stamp):
     # Create the PointCloud message
@@ -40,30 +40,29 @@ def create_pointcloud_msg(points, status, image_stamp):
         pointcloud_msg.channels.append(status_channel)
 
     return pointcloud_msg
-class CoTrackerNode:
+class TAPNextNode:
     def __init__(self):
         # Initialize the ROS node
-        rospy.init_node('cotracker_service')
-        self.service = rospy.Service("cotracker", cotracker, self.track_callback)
+        rospy.init_node('tapnext_service')
+        self.service = rospy.Service("tapnext", tapnext, self.track_callback)
 
         # Create a publisher for the output topic
-        self.debug_publisher = rospy.Publisher('/cotracker/debug_image', Image, queue_size=10)
+        self.debug_publisher = rospy.Publisher('/tapnext/debug_image', Image, queue_size=10)
 
         # Initialize CvBridge
         self.bridge = CvBridge()
 
-        # Initialize the CoTrackerWindow object
-        self.window = CoTrackerWindow(checkpoint='/home/co-tracker/checkpoints/scaled_online.pth',
-                                      offline_checkpoint='/home/co-tracker/checkpoints/scaled_offline.pth',
+        # Initialize the TAPNextTracker object
+        self.window = TAPNextTracker(checkpoint='/home/tapnet/checkpoints/bootstapnext_ckpt.npz',
                                       device='cuda')
         self.debug = True
 
-        rospy.loginfo("CoTracker Node is running.")
+        rospy.loginfo("TAPNext Node is running.")
 
     def track_callback(self, request):
-        if (len(self.window.video)==0):
-            forward_points_msg = self.image_callback(request.image)
-            return cotrackerResponse(forward_points_msg)
+        if (self.window.frame_no==-1):
+            forward_points_msg = self.image_callback(request.image, first_image=True)
+            return tapnextResponse(forward_points_msg)
             
         self.queries_callback(request.queries, request.removed_indices)
         forward_points_msg = self.image_callback(request.image)
@@ -73,14 +72,18 @@ class CoTrackerNode:
             ros_debug_image = self.bridge.cv2_to_imgmsg(debug_image, encoding='bgr8')
             self.debug_publisher.publish(ros_debug_image)
         
-        return cotrackerResponse(forward_points_msg)
+        return tapnextResponse(forward_points_msg)
 
-    def image_callback(self, msg):
+    def image_callback(self, msg, first_image=False):
         # Convert ROS Image message to OpenCV image
         cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')  # Should be `uint8`
         cv_image = np.clip(cv_image, 0, 255).astype(np.uint8)
-        self.window.add_image(cv_image)
-        forw_pts, status = self.window.track()            
+        if first_image:
+            self.window.init_image(cv_image)
+            forw_pts = None
+            status = None
+        else:
+            forw_pts, status = self.window.track(cv_image)            
         forw_pts_msg = create_pointcloud_msg(forw_pts, status, msg.header.stamp)
         return forw_pts_msg
 
@@ -99,10 +102,9 @@ class CoTrackerNode:
         # print(self.window.queries)
         # rospy.loginfo("Queries updated.")
 
-
 if __name__ == '__main__':
     try:
-        node = CoTrackerNode()
+        node = TAPNextNode()
         rospy.spin()
     except rospy.ROSInterruptException:
-        rospy.loginfo("Shutting down CoTracker Node.")
+        rospy.loginfo("Shutting down TAPNext Node.")

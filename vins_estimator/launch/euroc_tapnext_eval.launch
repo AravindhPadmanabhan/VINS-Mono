@@ -7,7 +7,7 @@
     <arg name="branch" default="update" /> -->
     <arg name="recorded_bag_path" default="/home/data" />
     
-    <!-- <node name="cotracker_service" pkg="cotracker_pkg" type="cotracker_node.py" output="log">
+    <!-- <node name="tapnext_service" pkg="tapnext_pkg" type="tapnext_node.py" output="log">
     </node> -->
     
     <node name="feature_tracker" pkg="feature_tracker" type="feature_tracker" output="log">
