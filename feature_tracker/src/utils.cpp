@@ -27,9 +27,9 @@ pair<vector<cv::Point2f>, vector<uchar>> readResponse(const sensor_msgs::PointCl
     return make_pair(points2d, status_values);
 }
 
-cotracker_pkg::cotracker createRequest(const vector<cv::Point2f>& queries, const vector<int>& removed_indices, const cv::Mat& img, const std_msgs::Header& header)
+tapnext_pkg::tapnext createRequest(const vector<cv::Point2f>& queries, const vector<int>& removed_indices, const cv::Mat& img, const std_msgs::Header& header)
 {
-    cotracker_pkg::cotracker srv;
+    tapnext_pkg::tapnext srv;
 
     if (queries.size() != removed_indices.size()) {
         ROS_DEBUG("Size of queries and removed_indices are different: %lu and %lu", queries.size(), removed_indices.size());
