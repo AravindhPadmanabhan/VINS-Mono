@@ -66,10 +66,10 @@ class TAPNextTracker:
             __ = self.model(frame=self.init_img, queries=self.queries)
             self.is_first_step = False
 
-        tracks, status = self.model.model(frame=img_tensor, queries=self.queries, removed_indices=self.removed_indices)
+        tracks, status = self.model(frame=img_tensor, queries=self.queries, removed_indices=self.removed_indices)
 
-        self.cur_tracks = tracks
-        return tracks, status
+        self.cur_tracks = tracks[0,0]
+        return tracks[0,0], status[0,0]
     
     def debug_tracks(self):
         latest_frame_np = self.latest_img.squeeze(0).cpu().numpy()

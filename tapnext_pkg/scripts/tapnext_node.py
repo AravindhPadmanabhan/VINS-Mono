@@ -11,7 +11,7 @@ import numpy as np
 sys.path.append(os.path.dirname(__file__))
 
 from tapnext_pkg.srv import tapnext, tapnextResponse 
-from tapnext_pkg.scripts.tapnext_tracker import TAPNextTracker
+from tapnext_tracker import TAPNextTracker
 
 def create_pointcloud_msg(points, status, image_stamp):
     # Create the PointCloud message
