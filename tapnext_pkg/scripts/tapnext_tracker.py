@@ -20,13 +20,15 @@ class TAPNextTracker:
         self.is_first_step = True
         self.init_img = None
         self.latest_img = None
+        self.reset_interval = 48
+        self.delay = 0
 
     def update_queries(self, new_points, removed_indices): 
         init_queries = self.queries.shape[1]
         self.removed_indices = removed_indices
         if len(new_points) > 0:
             new_points = torch.tensor(new_points, dtype=torch.float32).to(self.device)  # Shape: (N,2)
-            frame = torch.ones(new_points.shape[0], 1).to(self.device) * self.frame_no  # Shape: (N,1)
+            frame = torch.ones(new_points.shape[0], 1).to(self.device) * (self.frame_no - self.delay)  # Shape: (N,1)
             self.new_queries = torch.cat((frame, new_points), dim=1).unsqueeze(0)  # Shape: (1,N,3)
         else:
             self.new_queries = torch.zeros(1,0,3).to(self.device)
@@ -49,7 +51,26 @@ class TAPNextTracker:
         self.frame_no += 1
         self.init_img = img_tensor
 
+    def model_reset(self):
+        # Tracking till frame T is done and frame T+1 is here at this point. Model restart would be with T, T+1 and the updated queries in T
+        self.model.reset()
+        # self.is_first_step = True
+        self.delay += self.reset_interval
+
+        mask = torch.ones(self.cur_tracks.shape[0], dtype=torch.bool)
+        mask[self.removed_indices] = False
+        query_coords = self.cur_tracks[mask]  # Get the coordinates of the remaining tracks
+        query_coords = torch.cat((query_coords, self.new_queries[0, :, 1:3]), dim=0) 
+        frame = torch.ones(query_coords.shape[0], 1).to(self.device) * (self.frame_no - self.delay)  # Shape: (N,1)
+        self.queries = torch.cat((frame, query_coords), dim=1).unsqueeze(0)  # Shape: (1,N,3)
+
+        __ = self.model(frame=self.latest_img, queries=self.queries)
+
+
     def track(self, image):
+        if self.frame_no % self.reset_interval == 0:
+            self.model_reset(img_tensor)
+
         img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         img_tensor = torch.tensor(img_rgb, dtype=torch.float32).unsqueeze(0).to(self.device)  # Shape: (1,H,W,3)
         self.frame_no += 1
