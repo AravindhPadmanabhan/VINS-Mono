@@ -54,7 +54,6 @@ class TAPNextTracker:
     def model_reset(self):
         # Tracking till frame T is done and frame T+1 is here at this point. Model restart would be with T, T+1 and the updated queries in T
         self.model.reset()
-        # self.is_first_step = True
         self.delay += self.reset_interval
 
         mask = torch.ones(self.cur_tracks.shape[0], dtype=torch.bool)
@@ -65,11 +64,12 @@ class TAPNextTracker:
         self.queries = torch.cat((frame, query_coords), dim=1).unsqueeze(0)  # Shape: (1,N,3)
 
         __ = self.model(frame=self.latest_img, queries=self.queries)
+        self.removed_indices = []
 
 
     def track(self, image):
-        if self.frame_no % self.reset_interval == 0:
-            self.model_reset(img_tensor)
+        if self.frame_no % self.reset_interval == 0 and self.frame_no > 0:
+            self.model_reset()
 
         img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         img_tensor = torch.tensor(img_rgb, dtype=torch.float32).unsqueeze(0).to(self.device)  # Shape: (1,H,W,3)
