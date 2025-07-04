@@ -10,6 +10,7 @@ usage() {
 BAG_DIR=${1:-"/home/data/euroc"}  
 BRANCH=${2:-"eval"}
 PLAYBACK_RATE=${3:-1.0}  
+METRIC=${4:-"RPE"}
 
 # Check if the bag directory exists
 if [ ! -d "$BAG_DIR" ]; then
@@ -69,3 +70,16 @@ done
 
 echo "All bag files processed!"
 echo "Recorded bags are saved in: $EVAL_DIR"
+
+sleep 10
+
+for BAG_FILE in "$EVAL_DIR"/*.bag; do
+    echo "RESULTS FOR $BAG_FILE"
+    if [[ "$METRIC" == "RPE" ]]; then
+        evo_rpe bag $BAG_FILE /benchmark_publisher/odometry /vins_estimator/odometry -a -d 1 -u m
+    elif [[ "$METRIC" == "APE" ]]; then
+        evo_ape bag $BAG_FILE /benchmark_publisher/odometry /vins_estimator/odometry -a
+    else
+        echo "Unknown metric: $METRIC. Use 'RPE' or 'APE'."
+    fi
+done
