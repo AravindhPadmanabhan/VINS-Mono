@@ -61,11 +61,6 @@ void FeatureTracker::setMask(vector<int> &indices)
     for (unsigned int i = 0; i < forw_pts.size(); i++)
         cnt_pts_id.push_back(make_pair(track_cnt[i], make_pair(make_pair(indices[i], forw_pts[i]), ids[i])));
 
-    // sort(cnt_pts_id.begin(), cnt_pts_id.end(), [](const pair<int, pair<pair<int, cv::Point2f>, int>> &a, const pair<int, pair<pair<int, cv::Point2f>, int>> &b)
-    //      {
-    //         return a.first > b.first;
-    //      });
-
     if (forw_pts.size() >= 1)
         for (int i = 0; i < forw_pts.size()-1; i++)
             if (track_cnt[i] < track_cnt[i+1])
@@ -125,17 +120,16 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
     }
 
     forw_pts.clear();
-    vector<int> indices; // indices of forw_pts. Keeps track of which forw_pts are rejected so that they can be replaced by n_pts in the server.
+    vector<int> indices;
     int num_queries = 0;
 
     // Call the service
     vector<uchar> track_status;
-    trackon_pkg::trackon srv = createRequest(n_pts, removed_indices, forw_img, header); // new_queries instead of n_pts? If not, remove new_queries.
+    trackon_pkg::trackon srv = createRequest(n_pts, removed_indices, forw_img, header);
     if (client_.call(srv)) {
         const auto forw_pts_msg = srv.response.forward_points;
-        // ROS_INFO_STREAM("n_pts: " << n_pts.size() << ", removed_indices: " << removed_indices.size() << ", forw_pts: " << forw_pts_msg.points.size());
-        if (forw_pts_msg.points.size() > 0) {  // equivalent to cur_pts.size() > 0 as presence of cur_pts would imply presence of tracks of cur_pts
-            auto result = readResponse(forw_pts_msg); // is the order of forw_pts preserved?
+        if (forw_pts_msg.points.size() > 0) {
+            auto result = readResponse(forw_pts_msg);
             forw_pts = result.first;
             track_status = result.second;
             for(int i=0; i<forw_pts.size(); i++)
@@ -152,9 +146,6 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
     if (cur_pts.size() > 0)
     {
         TicToc t_o;
-        // vector<uchar> status;
-        // vector<float> err;
-        // cv::calcOpticalFlowPyrLK(cur_img, forw_img, cur_pts, forw_pts, status, err, cv::Size(21, 21), 3);
 
         for (int i = 0; i < int(forw_pts.size()); i++)
             if (track_status[i] && !inBorder(forw_pts[i]))
@@ -168,7 +159,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
         reduceVector(track_cnt, track_status);
         ROS_DEBUG("temporal optical flow costs: %fms", t_o.toc());
     }
-    ROS_INFO_STREAM("Tracks: " << forw_pts.size());
+    ROS_DEBUG_STREAM("Tracks: " << forw_pts.size());
 
     for (auto &n : track_cnt)
         n++;
@@ -177,10 +168,10 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
     {
         rejectWithF(indices);
         ROS_DEBUG("set mask begins");
-        ROS_INFO_STREAM("RANSAC: " << forw_pts.size());
+        ROS_DEBUG_STREAM("RANSAC: " << forw_pts.size());
         TicToc t_m;
         setMask(indices);
-        ROS_INFO_STREAM("Mask: " << forw_pts.size());
+        ROS_DEBUG_STREAM("Mask: " << forw_pts.size());
         ROS_DEBUG("set mask costs %fms", t_m.toc());
 
         ROS_DEBUG("detect feature begins");
