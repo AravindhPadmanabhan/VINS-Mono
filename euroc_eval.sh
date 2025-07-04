@@ -76,6 +76,8 @@ done
 echo "All bag files processed!"
 echo "Recorded bags are saved in: $EVAL_DIR"
 
+sleep 10
+
 for BAG_FILE in "$EVAL_DIR"/*.bag; do
     echo "RESULTS FOR $BAG_FILE"
     if [[ "$METRIC" == "RPE" ]]; then
