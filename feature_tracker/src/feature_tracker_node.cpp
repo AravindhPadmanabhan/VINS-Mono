@@ -58,11 +58,9 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
     else
         PUB_THIS_FRAME = false;
 
-    // ROS_INFO_STREAM("Raw image encoding: " << img_msg->encoding);
-
     cv_bridge::CvImageConstPtr ptr;
-    if (img_msg->encoding == "8UC1")
-    {
+    cv_bridge::CvImageConstPtr ptr_bgr;
+    if (img_msg->encoding == "8UC1") {
         sensor_msgs::Image img;
         img.header = img_msg->header;
         img.height = img_msg->height;
@@ -72,17 +70,23 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
         img.data = img_msg->data;
         img.encoding = "mono8";
         ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8);
+        cv::Mat bgr_img;
+        cv::cvtColor(ptr->image, bgr_img, cv::COLOR_GRAY2BGR);
+        ptr_bgr = boost::make_shared<cv_bridge::CvImage>(ptr->header, sensor_msgs::image_encodings::BGR8, bgr_img);
+    } else {
+        ptr_bgr = cv_bridge::toCvCopy(img_msg, sensor_msgs::image_encodings::BGR8);
+        cv::Mat gray_img;
+        cv::cvtColor(ptr_bgr->image, gray_img, cv::COLOR_BGR2GRAY);
+        ptr = boost::make_shared<cv_bridge::CvImage>(ptr_bgr->header, sensor_msgs::image_encodings::MONO8, gray_img);
     }
-    else
-        ptr = cv_bridge::toCvCopy(img_msg, sensor_msgs::image_encodings::MONO8);
+       
 
-    cv::Mat show_img = ptr->image;
     TicToc t_r;
     for (int i = 0; i < NUM_OF_CAM; i++)
     {
         ROS_DEBUG("processing camera %d", i);
         if (i != 1 || !STEREO_TRACK)
-            trackerData[i].readImage(ptr->image.rowRange(ROW * i, ROW * (i + 1)), img_msg->header);
+            trackerData[i].readImage(ptr_bgr->image.rowRange(ROW * i, ROW * (i + 1)), img_msg->header);
         else
         {
             if (EQUALIZE)
@@ -166,17 +170,16 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
         {
             ptr = cv_bridge::cvtColor(ptr, sensor_msgs::image_encodings::BGR8);
             //cv::Mat stereo_img(ROW * NUM_OF_CAM, COL, CV_8UC3);
-            cv::Mat stereo_img = ptr->image;
+            // cv::Mat stereo_img = ptr->image;
 
             for (int i = 0; i < NUM_OF_CAM; i++)
             {
-                cv::Mat tmp_img = stereo_img.rowRange(i * ROW, (i + 1) * ROW);
-                cv::cvtColor(show_img, tmp_img, CV_GRAY2RGB);
-
+                cv::Mat tmp_img = ptr_bgr->image;
+                int point_size = ROW / 120;
                 for (unsigned int j = 0; j < trackerData[i].cur_pts.size(); j++)
                 {
                     double len = std::min(1.0, 1.0 * trackerData[i].track_cnt[j] / WINDOW_SIZE);
-                    cv::circle(tmp_img, trackerData[i].cur_pts[j], 2, cv::Scalar(255 * (1 - len), 0, 255 * len), 2);
+                    cv::circle(tmp_img, trackerData[i].cur_pts[j], point_size, cv::Scalar(255 * (1 - len), 0, 255 * len), -1);
                     //draw speed line
                     /*
                     Vector2d tmp_cur_un_pts (trackerData[i].cur_un_pts[j].x, trackerData[i].cur_un_pts[j].y);
@@ -195,10 +198,10 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
             }
             //cv::imshow("vis", stereo_img);
             //cv::waitKey(5);
-            pub_match.publish(ptr->toImageMsg());
+            pub_match.publish(ptr_bgr->toImageMsg());
         }
     }
-    ROS_DEBUG("whole feature tracker processing costs: %f", t_r.toc());
+    ROS_INFO("whole feature tracker processing costs: %f", t_r.toc());
 }
 
 int main(int argc, char **argv)
@@ -215,7 +218,9 @@ int main(int argc, char **argv)
     {
         for (int i = 0; i < NUM_OF_CAM; i++)
         {
-            trackerData[i].fisheye_mask = cv::imread(FISHEYE_MASK, 0);
+            // trackerData[i].fisheye_mask = cv::imread(FISHEYE_MASK, 0);
+            trackerData[i].fisheye_mask = cv::Mat::zeros(ROW, COL, CV_8UC1);
+            cv::circle(trackerData[i].fisheye_mask, cv::Point2f(COL/2, ROW/2), COL/2, cv::Scalar(255), -1, 8, 0);
             if(!trackerData[i].fisheye_mask.data)
             {
                 ROS_INFO("load mask fail");
