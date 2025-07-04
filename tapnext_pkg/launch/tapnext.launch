@@ -5,8 +5,6 @@
         type="tapnext_node.py"
         name="tapnext_service"
         output="log">
-        <!-- Remap topics -->
-        <!-- <remap from="/input_image" to="/camera/image_raw" />
-        <remap from="/output_image" to="/processed_image" /> -->
+        <rosparam file="$(find tapnext_pkg)/config/config.yaml" command="load" />
     </node>
 </launch>

@@ -52,10 +52,13 @@ class TAPNextNode:
         # Initialize CvBridge
         self.bridge = CvBridge()
 
+        self.checkpoint = rospy.get_param('~checkpoint', "/home/TAP-VINS/catkin_ws/tap/tapnet/checkpoints/bootstapnext_ckpt.npz")
+        self.device = rospy.get_param('~device', 'cuda')
+        self.debug = rospy.get_param('~debug', True)
+
         # Initialize the TAPNextTracker object
-        self.window = TAPNextTracker(checkpoint='/home/tapnet/checkpoints/bootstapnext_ckpt.npz',
-                                      device='cuda')
-        self.debug = True
+        self.window = TAPNextTracker(checkpoint=self.checkpoint,
+                                      device=self.device)
 
         rospy.loginfo("TAPNext Node is running.")
 

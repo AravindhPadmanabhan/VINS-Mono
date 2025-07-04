@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# Check if the mandatory "branch" argument is provided
-if [ $# -lt 1 ]; then
-    echo "Usage: $0 <branch> [bag_directory] [playback_rate]"
+# Usage info
+usage() {
+    echo "Usage: $0 [euroc_bags_directory] [branch (name to append to sequence. If branch="eval", recorded bag will look like MH_01_eval)] [rosbag_playback_rate]"
     exit 1
-fi
+}
 
 # Read arguments
-BRANCH=$1  # Mandatory: Branch name to append
-BAG_DIR=${2:-"/home/data/euroc"}  # Optional: Bag directory (default: /home/data/euroc)
-PLAYBACK_RATE=${3:-1.0}  # Optional: Playback speed (default: 1.0x)
+BAG_DIR=${1:-"/home/data/euroc"}  
+BRANCH=${2:-"eval"}
+PLAYBACK_RATE=${3:-0.5}  
 
 # Check if the bag directory exists
 if [ ! -d "$BAG_DIR" ]; then
@@ -17,7 +17,7 @@ if [ ! -d "$BAG_DIR" ]; then
     exit 1
 fi
 
-EVAL_DIR="/home/data/euroc/${BRANCH}"  # Directory to save the recorded bags
+EVAL_DIR="${BAG_DIR}/${BRANCH}"  # Directory to save the recorded bags
 
 if [ ! -d "$EVAL_DIR" ]; then
     echo "Directory does not exist. Creating: $EVAL_DIR"
@@ -29,6 +29,8 @@ fi
 echo "Playing rosbag files from: $BAG_DIR"
 echo "Playback rate: $PLAYBACK_RATE"
 echo "Branch: $BRANCH"
+
+source ../../devel/setup.bash  # Source the ROS workspace
 
 # Loop through all .bag files in the directory
 for BAG_FILE in "$BAG_DIR"/*.bag; do
@@ -69,4 +71,6 @@ for BAG_FILE in "$BAG_DIR"/*.bag; do
     echo "-----------------------------------"
 done
 
+
 echo "All bag files processed!"
+echo "Recorded bags are saved in: $EVAL_DIR"
