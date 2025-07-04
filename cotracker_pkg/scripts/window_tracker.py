@@ -6,8 +6,8 @@ import numpy as np
 import cv2
 
 class CoTrackerWindow:
-    def __init__(self, checkpoint, offline_checkpoint, device='cuda'):
-        self.model = CoTrackerOnlinePredictor(checkpoint=checkpoint, local_grid_size=0, local_grid_extent=0)
+    def __init__(self, checkpoint, offline_checkpoint, local_grid_size, local_grid_extent, device='cuda'):
+        self.model = CoTrackerOnlinePredictor(checkpoint=checkpoint, local_grid_size=local_grid_size, local_grid_extent=local_grid_extent)
         self.offline_model = CoTrackerPredictor(checkpoint=offline_checkpoint)
         self.model.to(device)
         self.offline_model.to(device)

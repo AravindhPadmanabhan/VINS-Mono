@@ -14,18 +14,14 @@ from cotracker_pkg.srv import cotracker, cotrackerResponse
 from window_tracker import CoTrackerWindow
 
 def create_pointcloud_msg(points, status, image_stamp):
-    # Create the PointCloud message
     pointcloud_msg = PointCloud()
     pointcloud_msg.header.frame_id = "map"
     pointcloud_msg.header.stamp = image_stamp
 
     if points is not None and status is not None:
-        # Convert points and status to numpy arrays
         points = points.cpu().numpy()
         status = np.array(status.cpu(), dtype=np.float32)
-        # print("number of successful tracks: ", status.sum())
         
-        # Create a channel for status
         status_channel = ChannelFloat32()
         status_channel.name = "status"
 
@@ -33,7 +29,7 @@ def create_pointcloud_msg(points, status, image_stamp):
             point = Point32()
             point.x = points[i, 0]
             point.y = points[i, 1]
-            point.z = 0.0  # Set z = 0
+            point.z = 0.0
             pointcloud_msg.points.append(point)
             status_channel.values.append(status[i])
 
@@ -46,17 +42,22 @@ class CoTrackerNode:
         rospy.init_node('cotracker_service')
         self.service = rospy.Service("cotracker", cotracker, self.track_callback)
 
-        # Create a publisher for the output topic
         self.debug_publisher = rospy.Publisher('/cotracker/debug_image', Image, queue_size=10)
-
-        # Initialize CvBridge
         self.bridge = CvBridge()
 
-        # Initialize the CoTrackerWindow object
-        self.window = CoTrackerWindow(checkpoint='/home/co-tracker/checkpoints/scaled_online.pth',
-                                      offline_checkpoint='/home/co-tracker/checkpoints/scaled_offline.pth',
-                                      device='cuda')
-        self.debug = True
+        self.checkpoint = rospy.get_param('~checkpoint', "/home/TAP-VINS/catkin_ws/tap/co-tracker/checkpoints/scaled_online.pth")
+        self.offline_checkpoint = rospy.get_param('~offline_checkpoint', "/home/TAP-VINS/catkin_ws/tap/co-tracker/checkpoints/scaled_offline.pth")
+        self.device = rospy.get_param('~device', 'cuda')
+        self.debug = rospy.get_param('~debug', True)
+
+        local_grid_size = rospy.get_param('~local_grid_size', 0)
+        local_grid_extent = rospy.get_param('~local_grid_extent', 0)
+
+        self.window = CoTrackerWindow(checkpoint=self.checkpoint,
+                                      offline_checkpoint=self.offline_checkpoint,
+                                      local_grid_size=local_grid_size,
+                                      local_grid_extent=local_grid_extent,
+                                      device=self.device)
 
         rospy.loginfo("CoTracker Node is running.")
 
@@ -76,8 +77,7 @@ class CoTrackerNode:
         return cotrackerResponse(forward_points_msg)
 
     def image_callback(self, msg):
-        # Convert ROS Image message to OpenCV image
-        cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')  # Should be `uint8`
+        cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         cv_image = np.clip(cv_image, 0, 255).astype(np.uint8)
         self.window.add_image(cv_image)
         forw_pts, status = self.window.track()            
@@ -85,7 +85,6 @@ class CoTrackerNode:
         return forw_pts_msg
 
     def queries_callback(self, new_queries, removed_indices):
-        # Extract points and additional channel from the PointCloud2 message
         points = []
         indices = []
         
@@ -96,9 +95,6 @@ class CoTrackerNode:
             indices.append(index)
 
         self.window.update_queries(points, indices)
-        # print(self.window.queries)
-        # rospy.loginfo("Queries updated.")
-
 
 if __name__ == '__main__':
     try:
