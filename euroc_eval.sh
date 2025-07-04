@@ -10,6 +10,7 @@ usage() {
 BAG_DIR=${1:-"/home/data/euroc"}  
 BRANCH=${2:-"eval"}
 PLAYBACK_RATE=${3:-0.3}  
+METRIC=${4:-"RPE"}
 
 # Check if the bag directory exists
 if [ ! -d "$BAG_DIR" ]; then
@@ -47,7 +48,7 @@ for BAG_FILE in "$BAG_DIR"/*.bag; do
     sleep 5
 
     # Start the ROS launch file in the background
-    roslaunch vins_estimator euroc_cotracker_eval.launch bag_name:=$BAG_NAME recorded_bag_path:=$RECORDED_BAG & 
+    roslaunch vins_estimator euroc_eval.launch bag_name:=$BAG_NAME recorded_bag_path:=$RECORDED_BAG & 
     LAUNCH_PID=$! &  # Store the launch file's process ID
     sleep 5
 
@@ -74,3 +75,14 @@ done
 
 echo "All bag files processed!"
 echo "Recorded bags are saved in: $EVAL_DIR"
+
+for BAG_FILE in "$EVAL_DIR"/*.bag; do
+    echo "RESULTS FOR $BAG_FILE"
+    if [[ "$METRIC" == "RPE" ]]; then
+        evo_rpe bag $BAG_FILE /benchmark_publisher/odometry /vins_estimator/odometry -a -d 1 -u m
+    elif [[ "$METRIC" == "APE" ]]; then
+        evo_ape bag $BAG_FILE /benchmark_publisher/odometry /vins_estimator/odometry -a
+    else
+        echo "Unknown metric: $METRIC. Use 'RPE' or 'APE'."
+    fi
+done
