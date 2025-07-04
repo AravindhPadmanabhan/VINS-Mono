@@ -1,0 +1,3 @@
+checkpoint:  "/home/TAP-VINS/catkin_ws/tap/track_on/checkpoints/track_on_checkpoint.pt"
+device: "cuda"
+debug: true

@@ -33,7 +33,7 @@ def create_pointcloud_msg(points, status, image_stamp):
             point = Point32()
             point.x = points[i, 0]
             point.y = points[i, 1]
-            point.z = 0.0  # Set z = 0
+            point.z = 0.0
             pointcloud_msg.points.append(point)
             status_channel.values.append(status[i])
 
@@ -42,20 +42,19 @@ def create_pointcloud_msg(points, status, image_stamp):
     return pointcloud_msg
 class TrackOnNode:
     def __init__(self):
-        # Initialize the ROS node
         rospy.init_node('trackon_service')
         self.service = rospy.Service("trackon", trackon, self.track_callback)
 
-        # Create a publisher for the output topic
         self.debug_publisher = rospy.Publisher('/trackon/debug_image', Image, queue_size=10)
 
-        # Initialize CvBridge
         self.bridge = CvBridge()
 
-        # Initialize the TrackOnWindow object
-        self.window = TrackOnWindow(checkpoint='/home/track_on/checkpoints/track_on_checkpoint.pt',
-                                      device='cuda')
-        self.debug = True
+        self.checkpoint = rospy.get_param('~checkpoint', "/home/TAP-VINS/catkin_ws/tap/track_on/checkpoints/track_on_checkpoint.pt")
+        self.device = rospy.get_param('~device', 'cuda')
+        self.debug = rospy.get_param('~debug', True)
+
+        self.window = TrackOnWindow(checkpoint=self.checkpoint,
+                                      device=self.device)
 
         rospy.loginfo("TrackOn Node is running.")
 
@@ -75,8 +74,7 @@ class TrackOnNode:
         return trackonResponse(forward_points_msg)
 
     def image_callback(self, msg, first_image=False):
-        # Convert ROS Image message to OpenCV image
-        cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')  # Should be `uint8`
+        cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         cv_image = np.clip(cv_image, 0, 255).astype(np.uint8)
         if first_image:
             self.window.init_image(cv_image)
@@ -88,7 +86,6 @@ class TrackOnNode:
         return forw_pts_msg
 
     def queries_callback(self, new_queries, removed_indices):
-        # Extract points and additional channel from the PointCloud2 message
         points = []
         indices = []
         
@@ -99,8 +96,6 @@ class TrackOnNode:
             indices.append(index)
 
         self.window.update_queries(points, indices)
-        # print(self.window.queries)
-        # rospy.loginfo("Queries updated.")
 
 
 if __name__ == '__main__':
