@@ -198,7 +198,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
             pub_match.publish(ptr->toImageMsg());
         }
     }
-    ROS_INFO("whole feature tracker processing costs: %f", t_r.toc());
+    ROS_DEBUG("whole feature tracker processing costs: %f", t_r.toc());
 }
 
 int main(int argc, char **argv)
