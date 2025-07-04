@@ -2,7 +2,7 @@
 
 # Usage info
 usage() {
-    echo "Usage: $0 [euroc_bags_directory] [branch (name to append to sequence. If branch="eval", recorded bag will look like MH_01_eval)] [rosbag_playback_rate]"
+    echo "Usage: $0 [euroc_bags_directory] [branch (name to append to sequence. If branch="eval", recorded bag will look like MH_01_eval)] [rosbag_playback_rate] [metric (RPE or APE)]"
     exit 1
 }
 
