@@ -47,10 +47,15 @@ void FeatureTracker::setMask()
     for (unsigned int i = 0; i < forw_pts.size(); i++)
         cnt_pts_id.push_back(make_pair(track_cnt[i], make_pair(forw_pts[i], ids[i])));
 
-    sort(cnt_pts_id.begin(), cnt_pts_id.end(), [](const pair<int, pair<cv::Point2f, int>> &a, const pair<int, pair<cv::Point2f, int>> &b)
-         {
-            return a.first > b.first;
-         });
+    // sort(cnt_pts_id.begin(), cnt_pts_id.end(), [](const pair<int, pair<pair<int, cv::Point2f>, int>> &a, const pair<int, pair<pair<int, cv::Point2f>, int>> &b)
+    //      {
+    //         return a.first > b.first;
+    //      });
+
+    if (forw_pts.size() >= 1)
+        for (int i = 0; i < forw_pts.size()-1; i++)
+            if (track_cnt[i] < track_cnt[i+1])
+                    ROS_ERROR("Track count not in order");
 
     forw_pts.clear();
     ids.clear();
@@ -69,7 +74,7 @@ void FeatureTracker::setMask()
 }
 
 void FeatureTracker::addPoints()
-{
+{   
     for (auto &p : n_pts)
     {
         forw_pts.push_back(p);
@@ -84,15 +89,19 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
     TicToc t_r;
     cur_time = _cur_time;
 
+    cv::Mat bgr_img, gray_img;
+    bgr_img = _img.clone();  // Keep the original BGR image
+    cv::cvtColor(bgr_img, gray_img, cv::COLOR_BGR2GRAY);  // Convert without modifying _img
+
     if (EQUALIZE)
     {
         cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
         TicToc t_c;
-        clahe->apply(_img, img);
+        clahe->apply(gray_img, img);
         ROS_DEBUG("CLAHE costs: %fms", t_c.toc());
     }
     else
-        img = _img;
+        img = gray_img;
 
     if (forw_img.empty())
     {
@@ -104,6 +113,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
     }
 
     forw_pts.clear();
+    n_pts.clear();
 
     if (cur_pts.size() > 0)
     {
@@ -115,6 +125,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
         for (int i = 0; i < int(forw_pts.size()); i++)
             if (status[i] && !inBorder(forw_pts[i]))
                 status[i] = 0;
+        
         reduceVector(prev_pts, status);
         reduceVector(cur_pts, status);
         reduceVector(forw_pts, status);
@@ -123,6 +134,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
         reduceVector(track_cnt, status);
         ROS_DEBUG("temporal optical flow costs: %fms", t_o.toc());
     }
+    // ROS_INFO_STREAM("Tracks: " << forw_pts.size());
 
     for (auto &n : track_cnt)
         n++;
@@ -131,8 +143,10 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
     {
         rejectWithF();
         ROS_DEBUG("set mask begins");
+        // ROS_INFO_STREAM("RANSAC: " << forw_pts.size());
         TicToc t_m;
         setMask();
+        // ROS_INFO_STREAM("Mask: " << forw_pts.size());
         ROS_DEBUG("set mask costs %fms", t_m.toc());
 
         ROS_DEBUG("detect feature begins");
@@ -148,8 +162,6 @@ void FeatureTracker::readImage(const cv::Mat &_img, double _cur_time)
                 cout << "wrong size " << endl;
             cv::goodFeaturesToTrack(forw_img, n_pts, MAX_CNT - forw_pts.size(), 0.01, MIN_DIST, mask);
         }
-        else
-            n_pts.clear();
         ROS_DEBUG("detect feature costs: %fms", t_t.toc());
 
         ROS_DEBUG("add feature begins");
