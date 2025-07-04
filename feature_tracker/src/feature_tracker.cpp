@@ -100,15 +100,19 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
     TicToc t_r;
     cur_time = header.stamp.toSec();
 
+    cv::Mat bgr_img, gray_img;
+    bgr_img = _img.clone();  // Keep the original BGR image
+    cv::cvtColor(bgr_img, gray_img, cv::COLOR_BGR2GRAY);  // Convert without modifying _img
+
     if (EQUALIZE)
     {
         cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
         TicToc t_c;
-        clahe->apply(_img, img);
+        clahe->apply(gray_img, img);
         ROS_DEBUG("CLAHE costs: %fms", t_c.toc());
     }
     else
-        img = _img;
+        img = gray_img;
 
     if (forw_img.empty())
     {
@@ -125,7 +129,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
 
     // Call the service
     vector<uchar> track_status;
-    tapnext_pkg::tapnext srv = createRequest(n_pts, removed_indices, forw_img, header);
+    tapnext_pkg::tapnext srv = createRequest(n_pts, removed_indices, bgr_img, header);
     if (client_.call(srv)) {
         const auto forw_pts_msg = srv.response.forward_points;
         if (forw_pts_msg.points.size() > 0) {

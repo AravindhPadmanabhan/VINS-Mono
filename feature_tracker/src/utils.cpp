@@ -50,19 +50,18 @@ tapnext_pkg::tapnext createRequest(const vector<cv::Point2f>& queries, const vec
         srv.request.removed_indices.push_back(removed_indices[i]);
     }
 
-    ROS_INFO_STREAM("New queries: " << queries.size() << ", Removed indices: " << removed_indices.size());
-    
+    ROS_DEBUG_STREAM("New queries: " << queries.size() << ", Removed indices: " << removed_indices.size());
 
     // Create image message:
     sensor_msgs::Image img_msg;
-    cv::Mat bgr_img;
-    cv::cvtColor(img, bgr_img, cv::COLOR_GRAY2BGR);
+    // cv::Mat bgr_img;
+    // cv::cvtColor(img, bgr_img, cv::COLOR_GRAY2BGR);
     try {
         // Use cv_bridge to convert the cv::Mat to a ROS Image message
         cv_bridge::CvImage cv_img;
         cv_img.header = header;               // Use the provided header
         cv_img.encoding = sensor_msgs::image_encodings::BGR8; // Adjust encoding based on your image type
-        cv_img.image = bgr_img;                   // Assign the OpenCV image
+        cv_img.image = img;                   // Assign the OpenCV image
 
         // Convert to sensor_msgs::Image
         img_msg = *cv_img.toImageMsg();
