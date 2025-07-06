@@ -63,7 +63,7 @@ class TAPNode:
                                          local_grid_size=local_grid_size,
                                          local_grid_extent=local_grid_extent,
                                          device=device,
-                                         debug=self.debug)
+                                         debug=debug)
 
         elif self.model == 'trackon':
             checkpoint = rospy.get_param('~trackon/checkpoint', "/home/TAP-VINS/catkin_ws/tap/track_on/checkpoints/track_on_checkpoint.pt")
@@ -81,25 +81,25 @@ class TAPNode:
 
         rospy.loginfo("TAP Node is running.")
 
-        def callback(self, request):
-            cv_image = self.bridge.imgmsg_to_cv2(request.image, desired_encoding='bgr8')
-            cv_image = np.clip(cv_image, 0, 255).astype(np.uint8)
-            forw_pts, status, debug_img = self.tracker.track_callback(cv_image, request.queries, request.removed_indices)
-            forw_pts_msg = create_pointcloud_msg(forw_pts, status, request.image.header.stamp)
+    def callback(self, request):
+        cv_image = self.bridge.imgmsg_to_cv2(request.image, desired_encoding='bgr8')
+        cv_image = np.clip(cv_image, 0, 255).astype(np.uint8)
+        forw_pts, status, debug_img = self.tracker.track_callback(cv_image, request.queries, request.removed_indices)
+        forw_pts_msg = create_pointcloud_msg(forw_pts, status, request.image.header.stamp)
 
-            if debug_img is not None:
-                ros_debug_image = self.bridge.cv2_to_imgmsg(debug_img, encoding='bgr8')
-                self.debug_publisher.publish(ros_debug_image)
-
-            return tapResponse(forward_points_msg)
+        if debug_img is not None:
+            ros_debug_image = self.bridge.cv2_to_imgmsg(debug_img, encoding='bgr8')
+            self.debug_publisher.publish(ros_debug_image)
+            
+        return tapResponse(forw_pts_msg)
 
 class CoTrackerNode:
-    def __init__(self, checkpoint, offline_checkpoint, local_grid_size, local_grid_extent, device='cuda', debug):
-        self.window = CoTrackerWindow(checkpoint=self.checkpoint,
-                                      offline_checkpoint=self.offline_checkpoint,
+    def __init__(self, checkpoint, offline_checkpoint, local_grid_size, local_grid_extent, device, debug):
+        self.window = CoTrackerWindow(checkpoint=checkpoint,
+                                      offline_checkpoint=offline_checkpoint,
                                       local_grid_size=local_grid_size,
                                       local_grid_extent=local_grid_extent,
-                                      device=self.device)
+                                      device=device)
 
         self.debug = debug
 
@@ -135,9 +135,9 @@ class CoTrackerNode:
         self.window.update_queries(points, indices)
 
 class TrackOnNode:
-    def __init__(self, checkpoint, device='cuda', debug=True):
-        self.tracker = TrackOnTracker(checkpoint=self.checkpoint,
-                                      device=self.device)
+    def __init__(self, checkpoint, device, debug):
+        self.tracker = TrackOnTracker(checkpoint=checkpoint,
+                                      device=device)
 
         self.debug = debug
 
@@ -179,7 +179,7 @@ class TrackOnNode:
         self.tracker.update_queries(points, indices)
 
 class TAPNextNode:
-    def __init__(self, checkpoint, device='cuda', debug=True):
+    def __init__(self, checkpoint, device, debug):
         self.tracker = TAPNextTracker(checkpoint=checkpoint,
                                         device=device)
 
