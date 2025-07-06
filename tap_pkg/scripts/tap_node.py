@@ -47,7 +47,7 @@ class TAPNode:
         self.debug_publisher = rospy.Publisher('/tap/debug_image', Image, queue_size=10)
         self.bridge = CvBridge()
 
-        self.model = rospy.get_param('~model', "cotracker")
+        self.model = rospy.get_param('~tap_model', "cotracker")
 
         if self.model == 'cotracker':
             checkpoint = rospy.get_param('~cotracker/checkpoint', "/home/TAP-VINS/catkin_ws/tap/co-tracker/checkpoints/scaled_online.pth")
@@ -64,6 +64,7 @@ class TAPNode:
                                          local_grid_extent=local_grid_extent,
                                          device=device,
                                          debug=debug)
+            rospy.loginfo("CoTracker3 Initialized.")
 
         elif self.model == 'trackon':
             checkpoint = rospy.get_param('~trackon/checkpoint', "/home/TAP-VINS/catkin_ws/tap/track_on/checkpoints/track_on_checkpoint.pt")
@@ -71,6 +72,7 @@ class TAPNode:
             debug = rospy.get_param('~debug', False)
 
             self.tracker = TrackOnNode(checkpoint=checkpoint, device=device, debug=debug)
+            rospy.loginfo("Track-On Initialized.")
 
         elif self.model == 'tapnext':
             checkpoint = rospy.get_param('~tapnext/checkpoint', "/home/TAP-VINS/catkin_ws/tap/tapnet/checkpoints/bootstapnext_ckpt.npz")
@@ -78,6 +80,7 @@ class TAPNode:
             debug = rospy.get_param('~debug', False)
 
             self.tracker = TAPNextNode(checkpoint=checkpoint, device=device, debug=debug)
+            rospy.loginfo("TAPNext Initialized.")
 
         rospy.loginfo("TAP Node is running.")
 
@@ -90,7 +93,7 @@ class TAPNode:
         if debug_img is not None:
             ros_debug_image = self.bridge.cv2_to_imgmsg(debug_img, encoding='bgr8')
             self.debug_publisher.publish(ros_debug_image)
-            
+
         return tapResponse(forw_pts_msg)
 
 class CoTrackerNode:
