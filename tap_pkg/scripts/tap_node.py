@@ -144,8 +144,6 @@ class TrackOnNode:
 
         self.debug = debug
 
-        rospy.loginfo("TrackOn Node is running.")
-
     def track_callback(self, image, queries, removed_indices):
         if (self.tracker.frame_no==-1):
             forw_pts, status = self.image_callback(image, first_image=True)

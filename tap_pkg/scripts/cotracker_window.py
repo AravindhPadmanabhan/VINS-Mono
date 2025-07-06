@@ -81,7 +81,6 @@ class CoTrackerWindow:
 
         # self.track_status = vis
         self.cur_tracks = tracks
-        print("tracks shape: ", tracks.shape)
 
         return tracks[0,-1,:,:], status
     

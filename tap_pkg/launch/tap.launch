@@ -4,7 +4,7 @@
         pkg="tap_pkg"
         type="tap_node.py"
         name="tap_service"
-        output="log">
+        output="screen">
         <rosparam file="$(find tap_pkg)/config/config.yaml" command="load" />
     </node>
 </launch>
