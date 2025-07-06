@@ -1,0 +1,17 @@
+tap_model: "cotracker" # Options: "cotracker", "trackon", "tapnext"
+
+cotracker:
+  checkpoint: "/home/TAP-VINS/catkin_ws/tap/co-tracker/checkpoints/scaled_online.pth"
+  offline_checkpoint: "/home/TAP-VINS/catkin_ws/tap/co-tracker/checkpoints/scaled_offline.pth"
+  local_grid_size: 0 # Size of the local grid, set to 0 for no local grid, set to n for an n x n grid
+  local_grid_extent: 0 # Patch size
+
+trackon:
+  checkpoint: "/home/TAP-VINS/catkin_ws/tap/track_on/checkpoints/track_on_checkpoint.pt"
+
+tapnext:
+  checkpoint: "/home/TAP-VINS/catkin_ws/tap/tapnet/checkpoints/bootstapnext_ckpt.npz"
+
+device: "cuda"
+debug: true
+

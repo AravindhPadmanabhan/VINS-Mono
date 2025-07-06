@@ -12,7 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
     cv_bridge
     camera_model
     message_filters
-    cotracker_pkg
+    tap_pkg
 )
 
 find_package(OpenCV REQUIRED)

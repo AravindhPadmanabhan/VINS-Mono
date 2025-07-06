@@ -1,0 +1,10 @@
+<launch>
+    <!-- Launch the image_processor_node -->
+    <node
+        pkg="tap_pkg"
+        type="tap_node.py"
+        name="tap_service"
+        output="log">
+        <rosparam file="$(find tap_pkg)/config/config.yaml" command="load" />
+    </node>
+</launch>

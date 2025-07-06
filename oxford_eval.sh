@@ -43,8 +43,8 @@ for BAG_FILE in "$BAG_DIR"/*.bag; do
 
     echo "Processing bag file: $BAG_NAME"
 
-    roslaunch cotracker_pkg cotracker.launch &
-    COTRACKER_PID=$! & # Store the cotracker process ID
+    roslaunch tap_pkg tap.launch &
+    TAP_PID=$! & # Store the tap process ID
     sleep 5
 
     # Start the ROS launch file in the background
@@ -60,7 +60,7 @@ for BAG_FILE in "$BAG_DIR"/*.bag; do
     kill -SIGINT $LAUNCH_PID
     sleep 2
     rosnode kill /rosbag_record
-    kill $COTRACKER_PID
+    kill $TAP_PID
 
     # Ensure all ROS nodes are shut down properly
     sleep 2

@@ -129,7 +129,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
 
     // Call the service
     vector<uchar> track_status;
-    cotracker_pkg::cotracker srv = createRequest(n_pts, removed_indices, bgr_img, header); // new_queries instead of n_pts? If not, remove new_queries.
+    tap_pkg::tap srv = createRequest(n_pts, removed_indices, bgr_img, header); // new_queries instead of n_pts? If not, remove new_queries.
     if (client_.call(srv)) {
         const auto forw_pts_msg = srv.response.forward_points;
         if (forw_pts_msg.points.size() > 0) {  
@@ -141,7 +141,7 @@ void FeatureTracker::readImage(const cv::Mat &_img, const std_msgs::Header& head
             num_queries = forw_pts.size();
         }
     } else {
-        ROS_ERROR("Failed to call cotracker service.");
+        ROS_ERROR("Failed to call tap service.");
     }
 
     removed_indices.clear();

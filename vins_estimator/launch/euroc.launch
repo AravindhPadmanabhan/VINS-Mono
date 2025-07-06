@@ -2,7 +2,7 @@
     <arg name="config_path" default = "$(find feature_tracker)/../config/euroc/euroc_config.yaml" />
 	  <arg name="vins_path" default = "$(find feature_tracker)/../config/../" />
     
-    <node name="cotracker_service" pkg="cotracker_pkg" type="cotracker_node.py" output="log">
+    <node name="tap_service" pkg="tap_pkg" type="tap_node.py" output="log">
     </node>
     
     <node name="feature_tracker" pkg="feature_tracker" type="feature_tracker" output="log">

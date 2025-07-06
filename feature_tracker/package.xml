@@ -18,7 +18,7 @@
   <build_depend>sensor_msgs</build_depend>
   <build_depend>cv_bridge</build_depend>
   <build_depend>message_filters</build_depend>
-  <build_depend>cotracker_pkg</build_depend>
+  <build_depend>tap_pkg</build_depend>
 
   <!-- Runtime dependencies -->
   <run_depend>roscpp</run_depend>
@@ -28,7 +28,7 @@
   <run_depend>sensor_msgs</run_depend>
   <run_depend>cv_bridge</run_depend>
   <run_depend>message_filters</run_depend>
-  <run_depend>cotracker_pkg</run_depend>
+  <run_depend>tap_pkg</run_depend>
 
   <!-- Export dependencies -->
   <export>
